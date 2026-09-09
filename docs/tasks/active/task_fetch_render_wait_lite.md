@@ -55,7 +55,7 @@
 
 - [ ] fetch_page 节点增加**渲染完成确认**：`wait_for_load_state`（networkidle 优先，domcontentloaded 兜底）+ 关键内容选择器/非占位文本等待（超时阈值 env 可配，如 `FETCH_RENDER_TIMEOUT_MS`），确认通过才交 parse_dom
 - [ ] **滑块/验证码覆盖层检测**：识别「拖动下方滑块完成拼图」等东财验证特征 → 走 ANTI_BOT 失败路径（终态 Error + 用户文案），**禁止继续解析半成品页面**
-- [ ] 默认目标 URL 更新：`.env.example` `TASK_TARGET_URLS` 与 README 演示步骤改为 concept 极速版两条（sz000858 / sz300810）；架构文档决策记录补 D4 修订注
+- [ ] 默认目标 URL 更新：`.env.example` `TASK_TARGET_URLS` 更新为 concept 极速版两条（sz000858 / sz300810）；README 演示步骤**新增/更新为** concept 极速版两条（README 现无东财 URL，仅 localhost 演示行，实为新增）；架构文档决策记录补 D4 修订注
 - [ ] 真机验收留痕：concept/sz000858 全管道复跑，SSE 事件流 + 截图路径 + 结论 JSON + 工单号写入实现备忘
 
 ## 非范围
@@ -79,7 +79,16 @@
 
 ## 验收标准
 
-- [ ] 全量测试命令通过（`.venv/bin/python -m pytest tests -q` 全绿，基线 104 passed 不回退）
+- [ ] 全量测试命令通过（`.venv/bin/python -m pytest tests -q` 全绿不回退；实测基线口径：`pytest --collect-only` = **106 collected** = **104 passed + 2 skipped**（2026-09-09 10-task 实测），改动后 104 passed 不减少、skipped 不新增失败）
+- [ ] **旧测 grep 影响面**（K7 · 2026-09-09 10-task 实测 `grep -rn "sz000858|sz300810|eastmoney" tests/` = **10 文件 26 处**，逐文件处置如下）：
+  - `tests/test_web_console_sse.py`（1 处 · TARGET_URL 常量）→ **改为 concept 版 URL**（与 .env.example 默认对齐）
+  - `tests/test_acquisition_pipeline.py`（9 处 · mock fetcher 失败注入 + live 冒烟）→ mock 失败注入用例**保留作 SSRF/失败注入语义**（mock 不联网，URL 仅参数）；`test_live_eastmoney` live 冒烟**参数化为 concept 版**（或维持 skipped 标注）
+  - `tests/test_acquisition_url.py`（2 处 · URL 白名单用例）→ **保留**（concept URL 同域 quote.eastmoney.com，白名单语义不受影响）
+  - `tests/test_web_console_api.py`（2 处 · API 入参 URL）→ **参数化/改为 concept 版**（与默认 URL 对齐）
+  - `tests/internal_rag_fakes.py`（2 处）· `tests/test_internal_rag_contract.py`（1 处）· `tests/test_internal_rag_graph.py`（1 处）· `tests/test_internal_rag_live.py`（2 处）→ **保留不受影响**（对内子图 fixture/契约，URL 仅透传参数，本 task 不碰对内链路）
+  - `tests/test_acquisition_parser.py`（5 处 · HTML fixture 内 sz000858 文本）→ **保留不受影响**（解析 fixture 文本与目标 URL 无关）
+  - `tests/test_acquisition_chunker.py`（1 处 · estimate_tokens("sz000858") 纯字符串）→ **保留不受影响**
+  - 显式断言：新增渲染等待/滑块检测**不破坏既有 mock fetcher 失败注入用例**（ANTI_BOT / FETCH_TIMEOUT 现行断言口径不变）；改动后 104 passed 基线全量不回退仍成立
 - [ ] `npx --yes dsh-coding-kit task lint-wiki-delta --target .` 通过
 - [ ] **渲染等待单测**：mock page 对象断言 fetch 节点在内容就绪前不放行（wait 逻辑被调用、超时走 FETCH_TIMEOUT）
 - [ ] **滑块检测单测**：含「拖动下方滑块」特征的 HTML fixture → ANTI_BOT 终态 Error；正常 fixture 不误报
@@ -169,3 +178,4 @@
 | 日期 | 说明 |
 |------|------|
 | 2026-09-09 | 00 起草初版（真机验收发现 · 人决切极速版 + 渲染确认） |
+| 2026-09-09 | 10-task 按 R1 退回意见修订 R2 送审：① 验收新增「旧测 grep 影响面」项（实测 10 文件 26 处逐文件处置标注）；② 基线数更正为实测口径 106 collected = 104 passed + 2 skipped；③ 范围第 3 条措辞「改为」→「新增/更新为」（README 现无东财 URL） |

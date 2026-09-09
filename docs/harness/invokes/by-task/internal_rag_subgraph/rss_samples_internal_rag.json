@@ -2,10 +2,10 @@
   "method": "psutil（macOS 无 /proc、docker 不可用 → 等效采样 · task residual_risks ③）",
   "interval_s": 0.05,
   "sample_count": 2,
-  "peak_mb": 131.83,
+  "peak_mb": 129.98,
   "limit_mb": 3072.0,
   "samples_mb": [
-    131.83,
-    131.81
+    129.98,
+    129.98
   ]
 }
