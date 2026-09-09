@@ -22,7 +22,7 @@
 | **invoke_retention_profile** | `default` |
 | **required_invoke_hats** | `10,30,40` |
 | **git_branch** | `task/web_console_mvp` |
-| **worktree_root** | none（单仓工作目录；与双轨子图并行时是否开独立 worktree 由 00 派发时决定） |
+| **worktree_root** | `.worktrees/web`（联调棒 · 分支 task/web_console_mvp） |
 | **graph_delta** | `none` |
 | **graph_delta_note** | 本仓尚无 `docs/_tech_graph/` 目录与 flow 真值，本 task 不新增图谱文件；后续引入图谱时再补 |
 | **wiki_delta** | `none` |
