@@ -165,8 +165,19 @@ Embedding 模型具体选型（维度/中文能力）按 SPEC residual_risks 留
 
 | 项 | 状态 | 备注 |
 |----|------|------|
-| 30 实现 | ⏳ | |
-| 40 自检 | ⏳ | |
+| 30 实现 | ✅ | 六节点按架构 §1.3 三行式填入 stub 骨架；实现细节下沉 `app/services/acquisition/`（url_validator / browser / parser / chunker / embedder / payload / errors），图层只做编排 + 异常归一 + 状态钩子 |
+| 40 自检 | ✅ | 见下方「自检结论（执行者）」：verify PASS · pytest 59 passed/1 skipped · lint-wiki-delta PASS |
+
+实现期裁定（R2/R4 续填 · 不越 SPEC 边界）：
+
+1. **Embedding 落地**：`ChunkEmbedder` 走 openai 兼容客户端，base_url/api_key/model 全部来自 `app.config`（人决 D2/D5，零模型名/密钥字面量）；空 chunks 不调 API。
+2. **token 计数**：仓内无 tiktoken/transformers 且 `requirements.txt` 为共享文件禁改，采用确定性近似估计（CJK 1 字 ≈ 1 token，非 CJK 连续段 4 字符 ≈ 1 token），切分与契约断言共用同一函数，离线可复现；与 bge-m3 真实分词的口径偏差属 residual_risks ① 已知项。
+3. **切分不变式**：每条 chunk ∈ [512,1024] tokens（贪婪打包 + 超长块句边界切片/字符硬切兜底 + 尾部残余向上一 chunk 回挪/借句再平衡）；整页文本 < 512 tokens → 空 pre_chunks 走 FP-3（不产出违约短块）；极端边角（并入上一块将超 1024 且借句不可行）丢弃尾部残余并 warning 留痕。
+4. **BoundingRect 绑定**：n2 以 JS 采集 xpath→bbox 映射随 `FetchResult.bbox_map` 带出，n3 以 BS4 同规则推导 xpath 查表绑定（两侧 `/html[1]/body[1]/…` 规则逐字对齐，已用真实浏览器对 example.com 验证命中）。
+5. **SSRF**：http/https 白名单 + ipaddress 全量私网/环回/保留段拒绝 + `socket.inet_aton` 归一化短写 IP（127.1 等）+ localhost/*.local/*.internal 拒绝；不做 DNS 解析（rebinding 属 V2 反爬范畴）。
+6. **状态钩子**：模块级 `register_status_hook`，n6 出口广播 `Fetching→Parsing(progress=50)`，各失败节点广播 `→Error`；观察者异常不阻断管道。
+7. **依赖零新增**：jsonschema 缺席故 §1.5 校验为自实现最小检查器（`payload.validate_payload`）；`app/services/__init__.py` 为空包标记（共享文件改动请求见回报）。
+8. **live 冒烟**：`ACQ_LIVE_SMOKE=1` 开启真实东财页 + 真实 Embedding，默认关闭；单元测试零真实浏览器/Embedding/外网。
 
 ---
 
@@ -180,7 +191,30 @@ Embedding 模型具体选型（维度/中文能力）按 SPEC residual_risks 留
 
 ### 自检结论（执行者）
 
-（30/40 回填）
+**命令块**（cwd = worktree 根 `.worktrees/acq` · 解释器 `/Users/cyning/Desktop/grab_web_agent/.venv/bin/python`）：
+
+| 命令 | 退出码 | 关键输出 |
+|------|--------|----------|
+| `npx --yes dsh-coding-kit@1.10.0 verify --task docs/tasks/active/task_web_acquisition_subgraph.md` | 0 | `VERIFY: PASS`（HG-TASK-DRAFT/HG-AUDIT-R1 均 approved，可 30） |
+| `python -m pytest tests -q` | 0 | `59 passed, 1 skipped`（skipped = live 冒烟，`ACQ_LIVE_SMOKE=1` 默认关） |
+| `npx --yes dsh-coding-kit@1.10.0 task lint-wiki-delta --target .` | 0 | `LINT-WIKI-DELTA: PASS`（missing 0 · issues 0） |
+| 一次性真实浏览器 sanity（非测试）：`PlaywrightFetcher` 抓 example.com | 0 | http 200 · 截图 18KB 落盘 `app/static/` · bbox_map 命中绑定（sanity 截图已清理，未入库） |
+
+**验收逐条对照**：
+
+| 验收标准 | 结论 | 证据 |
+|----------|------|------|
+| 全量测试命令通过 | pass | `pytest tests -q` 59 passed（含 scaffold 冒烟 3 条回归无破坏） |
+| lint-wiki-delta 预检 | pass | `LINT-WIKI-DELTA: PASS` |
+| 契约测试（本地静态页全管道过 §1.5 校验） | pass | `test_full_pipeline_payload_contract`：`validate_payload(payload) == []`，url/screenshot_path/extracted_meta/pre_chunks 齐全 |
+| 切分断言（512–1024 tokens · section_path/xpath 非空） | pass | 契约测试逐块断言 + chunker 单测 8 例（合并/切分/硬切/尾部再平衡/空页） |
+| 截图断言（真实落盘可读 · 路径可追溯） | pass | 桩 PNG 写入 tmp static 目录并断言 `\x89PNG` 魔数；payload 路径 `/static/` 前缀 |
+| 铁律一审计（日志 grep 无多模态调用） | pass | `test_iron_rule_one_no_multimodal_calls` 对全流程 caplog 断言无 multimodal/vision/多模态/视觉字样；全码零视觉模型调用路径 |
+| SSRF 用例（file:// · 内网段拒绝并落日志） | pass | `test_acquisition_url.py` 24 例参数化（含 10.x/172.16.x/192.168.x/127.x/169.254.x/[::1]/短写 127.1/localhost/*.local/*.internal）+ SSRF 拦截日志断言 + 图入口短路断言（fetcher 不被调用） |
+| 失败注入 ×3（超时/403/空 body） | pass | `TestFailureInjection`：FETCH_TIMEOUT / ANTI_BOT(403+截图留痕) / 空 chunks 正常流转，终态 error 码与用户可见文案逐字断言 |
+| 状态迁移 Fetching→Parsing 可观测 | pass | 钩子事件 `{from:Fetching,to:Parsing,progress:50}` 断言；错误路径 `→Error` 事件断言 |
+
+**已知未测项**：live 冒烟（真实东财页 + 真实 SiliconFlow Embedding）默认关闭未跑；token 计数为近似估计（见实现备忘 2）；CDP Turbo 加速收益未量化（residual_risks ② 原样保留）；反爬成功率依赖目标站宽松度（residual_risks ③ 原样保留）。
 
 ---
 
