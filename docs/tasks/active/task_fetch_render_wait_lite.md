@@ -113,7 +113,7 @@
 |----|------|------|
 | 渲染确认策略 | ✅ | goto(domcontentloaded) 后 `wait_for_load_state`：networkidle 优先（超时降级 domcontentloaded 兜底，不视为失败）+ 非占位文本等待（`wait_for_function`：body innerText 剔除空白与 `-—–_` 占位符后 ≥30 字符）；阈值 `FETCH_RENDER_TIMEOUT_MS`（默认 10000，browser.py 模块内 os.getenv 读取 · app/config.py 冻结未动）；非占位等待超时 → FetchTimeout 终态，确认通过前不放行 content() |
 | 滑块特征清单 | ✅ | ① 文案：拖动下方滑块完成拼图 / 拖动左边滑块 / 滑块验证 / 请完成安全验证等；② DOM 组件签名：nc-container / nc_wrapper / geetest / slide-verify；③ **子框架 URL**：websitecaptcha / slidervalid —— 真机实证东财滑块挂独立 iframe（`i.eastmoney.com/websitecaptcha/slidervalid`），主框架 innerText/content 均扫不到，首轮实现漏检（截图含滑块却放行），补扫 `page.frames[1:]` 后修复；命中即 anti_bot_flag → ANTI_BOT 终态 + 截图留痕，禁止解析半成品 |
-| 真机复跑结果 | ⏳ D7 前口径实证 · 待 30 续施工回填 |（D7 前实证，D7 口径复跑由 30 续施工执行） NO_PROXY 净化后 uvicorn:8011 全管道实跑 5 次 + sz300810 探针 1 次（2026-09-09 19:25–19:52）：① **19:25 跑（渲染确认已生效 / iframe 检出修复前）**：Pending→Fetching(10%)→Parsing(50%)→RAGing→Done(100%)，12 切片含真实行情文本（分时成交/股吧时间戳 19:21 即渲染当时内容，渲染确认实证有效），结论 JSON 非空（price 仍「-」占位 → insufficient_info=true 如实输出，铁律一），**工单号 MOCK-18F5C515**，截图 `app/static/shot_8b1b8439f2_1788953109798.png` —— 但截图顶部含滑块覆盖层（iframe 盲区，主框架扫不到）；② **修复后 19:28/19:30/19:36/19:52 四跑 + sz300810 探针**：全部正确检出滑块 → ANTI_BOT 终态 Error + SSE error 事件（user_message「目标站点拒绝访问（反爬拦截）」）+ 截图留痕（`shot_8b1b8439f2_1788953319141.png` 等 4 张，滑块清晰可见供 00 人工看图），无半成品解析；③ 东财对本机 IP 持续下发滑块（6 连命中，含 15 分钟冷却后），「Done + 无滑块截图」本轮未达成 —— 残余风险①实锤，交 00 人决（换网络/时段重试或签收 ANTI_BOT 实证口径） |
+| 真机复跑结果 | ✅ D7 口径实证（2026-09-09 20:30 复跑） | **D7 复跑（30 续施工）**：NO_PROXY/no_proxy 双净化（本会话 no_proxy 残留 `[::1]` 致 httpx `InvalidURL: Invalid port: ':1]'`，embedding 首跑 EMBED_FAILED，双写净化后修复——净化须覆盖大小写两变量）后 uvicorn:8011 全管道 1 跑：检出滑块覆盖层（iframe websitecaptcha/slidervalid）+ 渲染探针通过 → **降级警告继续**：Pending→Fetching(10%)→**warning 事件 `PAGE_CAPTCHA_OVERLAY`（「页面含验证覆盖层，结果已人工可复核」）**→Parsing(50%)→13 切片真实行情文本（股吧时间戳 20:10–19:08 即渲染当时内容）→RAGing→conclusion（**结论 JSON 带 `warning` 标注字段**，insufficient_info=false，sources 含半年报）→progress 100→**Done**；**工单号 MOCK-31301BC5**；截图 `app/static/shot_8b1b8439f2_1788957032290.png`（顶部覆盖层留白区可见，D7 允许含覆盖层，00 人工看图复核）；事件流留档 /tmp/fetch_d7_events.json、快照 /tmp/fetch_d7_snapshot.json。（D7 前实证留存） NO_PROXY 净化后 uvicorn:8011 全管道实跑 5 次 + sz300810 探针 1 次（2026-09-09 19:25–19:52）：① **19:25 跑（渲染确认已生效 / iframe 检出修复前）**：Pending→Fetching(10%)→Parsing(50%)→RAGing→Done(100%)，12 切片含真实行情文本（分时成交/股吧时间戳 19:21 即渲染当时内容，渲染确认实证有效），结论 JSON 非空（price 仍「-」占位 → insufficient_info=true 如实输出，铁律一），**工单号 MOCK-18F5C515**，截图 `app/static/shot_8b1b8439f2_1788953109798.png` —— 但截图顶部含滑块覆盖层（iframe 盲区，主框架扫不到）；② **修复后 19:28/19:30/19:36/19:52 四跑 + sz300810 探针**：全部正确检出滑块 → ANTI_BOT 终态 Error + SSE error 事件（user_message「目标站点拒绝访问（反爬拦截）」）+ 截图留痕（`shot_8b1b8439f2_1788953319141.png` 等 4 张，滑块清晰可见供 00 人工看图），无半成品解析；③ 东财对本机 IP 持续下发滑块（6 连命中，含 15 分钟冷却后），「Done + 无滑块截图」本轮未达成 —— 残余风险①实锤，交 00 人决（换网络/时段重试或签收 ANTI_BOT 实证口径） |
 
 ---
 
@@ -129,21 +129,29 @@
 
 | 验收项 | 结论 | 证据 |
 |--------|------|------|
-| 全量测试不回退 | ✅ pass | `pytest tests -q` exit 0：**114 passed, 2 skipped**；`--collect-only` = **116 collected**（基线 106=104+2，新增 10 全绿，零回退、skipped 无新增失败） |
+| 全量测试不回退 | ✅ pass | `pytest tests -q` exit 0：**120 passed, 2 skipped**；`--collect-only` = **122 collected**（基线 116=114+2；D7 续施工净增 6：滑块类改写 6→9、warning SSE ×2、横幅模板 ×1，零回退、skipped 无新增失败） |
 | 旧测 grep 影响面（10 文件 26 处逐条处置） | ✅ pass | 改 3 文件 4 处（sse TARGET_URL / api ×2 / pipeline live 冒烟 → concept 版，live 维持默认 skipped 不参数化以钉死 collected 口径）；保留 7 文件 22 处（mock 失败注入 SSRF 语义 / 白名单 / 对内 fixture / parser fixture / chunker 纯字符串）；显式断言成立：既有 ANTI_BOT/FETCH_TIMEOUT mock 注入用例断言口径不变且全绿 |
 | lint-wiki-delta | ✅ pass | `task lint-wiki-delta --target .` exit 0（LINT-WIKI-DELTA: PASS） |
 | 渲染等待单测 | ✅ pass | `tests/test_acquisition_browser.py::TestRenderWait` ×4：networkidle 优先 / 兜底链 / 超时 FetchTimeout 且不放行 content() / env 覆盖（全 mock，零浏览器） |
-| 滑块检测单测 | ⏳ D7 前口径实证 · 待 30 续施工回填 |（D7 前实证，验收以 D7 口径行为准） `TestSliderDetection` ×6：滑块 fixture → 图级 ANTI_BOT 终态（无 payload/blocks）；iframe URL / iframe 正文双检出；正常 fixture + 广告 iframe 不误报 |
+| 滑块检测单测 | ✅ pass（D7 口径 · 30 续施工改写） | `TestSliderDetection` ×9：①滑块 iframe + 探针通过 → 不判反爬 + `slider_overlay_flag`=True + 照常取 DOM/截图；②正文滑块文案 + 真实内容探针通过 → 降级警告；③仅验证文案探针不过 → ANTI_BOT + 截图留痕；④图级：探针通过 → 无 error + State `warning{PAGE_CAPTCHA_OVERLAY}` + Payload 照常产出；⑤图级：探针不过 → ANTI_BOT 终态（无 payload/blocks）；⑥iframe 正文检出降级；⑦硬反爬 403 不受 D7 放宽；⑧广告 iframe 不误报；⑨正常 fixture 不误报 |
 | 默认 URL 断言 | ✅ pass | `.env.example` L8 与 README L64-65 均为 concept/sz000858 + concept/sz300810（grep 实证） |
-| 真机 A5 复跑 | ⚠️ 部分 | 见实现备忘「真机复跑结果」行：A5 闭环（Done + 工单号 MOCK-18F5C515 + 结论非空）19:25 跑达成；「截图无滑块覆盖层」未达成 —— 东财持续下发滑块（6 连命中），修复后检出语义四跑实证（ANTI_BOT 终态 + 截图留痕）。**此项留 00 人决** |
+| warning SSE 事件（D7 新增链路） | ✅ pass | `test_web_console_sse.py` ×2：acq warning → SSE `warning` 事件透传（Pending→…→Done 序列不断）+ 结论 JSON 带 `warning{PAGE_CAPTCHA_OVERLAY}` 标注 + 注册表快照留痕 + 工单号照常闭环；无 warning 路径零误报（结论无标注、快照 warning=None） |
+| warning 横幅模板（D7 非范围例外一处） | ✅ pass | `test_web_console_api.py::test_template_contains_warning_banner_branch`：模板含 `#warn-banner` 黄色横幅容器 + `addEventListener("warning")` 渲染分支 + 文案「目标页含验证覆盖层，结果已人工可复核」 |
+| 真机 A5 复跑（D7 口径） | ✅ pass | 2026-09-09 20:30 concept/sz000858：Pending→…→Done + SSE 含 warning 事件 + 结论带覆盖层标注 + 工单号 MOCK-31301BC5 非空 + 截图留痕（含覆盖层，D7 允许，00 人工看图复核）；详见实现备忘「真机复跑结果」行 |
 
-已知未测项：① 干净会话（无滑块）下 concept 页端到端截图（站点侧阻断，非代码缺陷）；② `FETCH_RENDER_TIMEOUT_MS` 真机调参未做（单测覆盖 env 读取）。
+已知未测项：① 干净会话（完全无滑块）下 concept 页端到端截图（站点对本机 IP 持续下发滑块，非代码缺陷；D7 口径下覆盖层会话已实证「警告但继续」全链路）；② `FETCH_RENDER_TIMEOUT_MS` 真机调参未做（单测覆盖 env 读取）；③ warning 横幅为模板静态断言，浏览器端渲染观感未真机截图（SSE 事件流已实证到达）。
 
 命令块（workdir=.worktrees/fetch）：
 - `npx --yes dsh-coding-kit@1.10.0 verify --task docs/tasks/active/task_fetch_render_wait_lite.md` → exit 0 VERIFY: PASS（首跑 BLOCKED·缺 hat-10 invoke，主仓同步后 PASS）
 - `.venv/bin/python -m pytest tests -q`（仓根执行）→ exit 0（114 passed, 2 skipped）
 - `npx --yes dsh-coding-kit@1.10.0 task lint-wiki-delta --target .` → exit 0
 - 真机：`NO_PROXY=localhost,127.0.0.1,::1 uvicorn app.api.main:app --port 8011` + POST /api/task + SSE 流（事件留档 /tmp/fetch_realrun_events.json，截图 app/static/）
+
+D7 续施工命令块（2026-09-09 30/40 同上下文）：
+- `npm_config_cache=/tmp/npm-cache-dsh npx --yes dsh-coding-kit@1.10.0 verify --task docs/tasks/active/task_fetch_render_wait_lite.md` → exit 0 VERIFY: PASS（开工首跑）
+- `.venv/bin/python -m pytest tests -q` → exit 0（**120 passed, 2 skipped** · collect=122）
+- `npx --yes dsh-coding-kit@1.10.0 task lint-wiki-delta --target .` → exit 0（LINT-WIKI-DELTA: PASS）
+- 真机 D7 复跑：`env NO_PROXY=localhost,127.0.0.1,::1 no_proxy=localhost,127.0.0.1,::1 .venv/bin/python -m uvicorn app.api.main:app --port 8011` + POST /api/task + SSE 全事件收集 → Done + warning 事件 + 结论标注 + 工单号 MOCK-31301BC5（事件留档 /tmp/fetch_d7_events.json，快照 /tmp/fetch_d7_snapshot.json，截图 `app/static/shot_8b1b8439f2_1788957032290.png`）
 
 ---
 

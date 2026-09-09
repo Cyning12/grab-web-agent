@@ -1,6 +1,6 @@
 """Supervisor 主控图薄壳接线（架构 §1.2 · task_web_console_mvp 范围）。
 
-职责：接单 -> 顺序驱动对外子图 -> 对内子图 -> 广播状态/进度/chunk/结论/错误事件；
+职责：接单 -> 顺序驱动对外子图 -> 对内子图 -> 广播状态/进度/chunk/结论/警告/错误事件；
 本身不做任何 CPU/内存密集计算（铁律二/三职责在子图内）。
 
 两条调用路径共享同一组子图入口：
@@ -88,6 +88,11 @@ async def _run_rag_and_broadcast(
         return
     conclusion = _dump(rag_state.get("conclusion") or {})
     receipt = _dump(rag_state.get("receipt") or {})
+    record = registry.get(task_id)
+    if record is not None and record.warning:
+        # 人决 D7 结论标注：warning 为 Conclusion Schema 外附加字段（pydantic 默认
+        # 忽略 extra，对内 app/services/rag/schemas.py 不动），供页面侧人工复核提示
+        conclusion["warning"] = record.warning
     registry.update(task_id, conclusion=conclusion, receipt=receipt)
     registry.emit(task_id, "conclusion", {"conclusion": conclusion, "receipt": receipt})
     _emit_progress(registry, task_id, 100)
@@ -118,6 +123,13 @@ async def execute_task(
         if acq_state.get("error"):
             _fail(registry, task_id, acq_state["error"])
             return
+
+        # 人决 D7 警告透传（滑块覆盖层检出但渲染探针通过）：注册表留痕 +
+        # 第六类 SSE 事件 warning（架构 §1.1 D7 行）；不阻断管道，结论落盘时再标注
+        warning = acq_state.get("warning")
+        if warning:
+            registry.update(task_id, warning=warning)
+            registry.emit(task_id, "warning", warning)
 
         # Fetching → Parsing（n6 Payload 校验通过）
         payload: dict[str, Any] = acq_state.get("payload") or {}

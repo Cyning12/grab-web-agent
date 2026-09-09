@@ -47,3 +47,36 @@
 ## 阻塞/风险
 
 - 东财当前对本机 IP 持续下发滑块（concept 双链 + 探针共 5 连命中）；检出语义已实机验证（ANTI_BOT 终态 + SSE error + 截图留痕），「干净 Done + 无滑块截图」以冷却后末次重试结果为准，详见 task 实现备忘。
+
+---
+
+## D7 续施工段（2026-09-09 · 30/40 同上下文 · 人决 D7「滑块检出放宽为警告但继续」）
+
+### 开工闸扫描（GATE_VERIFY · 首输出）
+
+`npm_config_cache=/tmp/npm-cache-dsh npx --yes dsh-coding-kit@1.10.0 verify --task docs/tasks/active/task_fetch_render_wait_lite.md` → exit 0 **VERIFY: PASS**（HG-TASK-DRAFT / HG-AUDIT-R1 均 approved · R4 D7 口径在案）→ 可进入读码/改码。
+
+### 30 实施摘要（D7）
+
+| 改动 | 落点 | 要点 |
+|------|------|------|
+| 滑块检出降级 | `browser.py` | `_detect_anti_bot` 拆三：`_detect_hard_anti_bot`（403/401 + title/URL，**不放宽**）/ `_detect_slider_overlay`（正文 + DOM 签名 + 子框架补扫）/ `_content_probe_passed`（复用 `_CONTENT_READY_JS` 非占位门槛，探针异常一律视为不通过）；fetch() 检出覆盖层 → 先跑探针：通过 → `FetchResult.slider_overlay_flag=True` 降级警告继续（照常取 DOM/截图/bbox），不过 → 维持 ANTI_BOT 终态；两分支均不主动绕过验证 |
+| warning 图接线 | `app/graphs/acquisition.py` | `AcquisitionState` 增 `warning` 字段；fetch_page 见 `slider_overlay_flag` 即产出 `warning{code=PAGE_CAPTCHA_OVERLAY, message=「页面含验证覆盖层，结果已人工可复核」, node=fetch_page}` 随 State 透传 |
+| warning 第六类 SSE | `registry.py` / `supervisor.py` / `api/main.py` | TaskRecord 增 `warning` 字段 + snapshot 携带；execute_task 收 acq_state.warning → 注册表留痕 + emit `warning` 事件；`_run_rag_and_broadcast` 在结论 dict 加 `warning` 标注（**Conclusion Schema 外附加字段 · pydantic 默认忽略 extra · app/services/rag/** 零改动**）；main.py 仅文档口径五类→六类（转发对事件类型透明，warning 非终态不关流） |
+| 前端横幅 | `app/web/templates/index.html` | 非范围例外放行一处：`#warn-banner` 黄色横幅 + `addEventListener("warning")` 渲染分支（文案「目标页含验证覆盖层，结果已人工可复核」，回放事件幂等覆盖） |
+| 单测 D7 改写/新增 | tests/ ×6 净增 | `TestSliderDetection` 6→9（探针通过降级 ×2 / 探针不过 ANTI_BOT / 图级继续+warning / 图级 ANTI_BOT / iframe 正文降级 / 硬反爬不放宽 / 无误报 ×2）；`test_web_console_sse.py` +2（warning 透传+结论标注+快照留痕 / 无 warning 零误报）；`test_web_console_api.py` +1（横幅模板断言）；FakePage.evaluate 增探针分支（复用 `_CONTENT_READY_MIN_CHARS`） |
+
+### 40 自检（D7 段）
+
+| 命令 | 退出码 | 结果 |
+|------|--------|------|
+| `verify --task`（开工首跑） | 0 | VERIFY: PASS |
+| `.venv/bin/python -m pytest tests -q` | 0 | **120 passed, 2 skipped**（collect=122 · 基线 116 零回退） |
+| `task lint-wiki-delta --target .` | 0 | LINT-WIKI-DELTA: PASS |
+| 真机 D7 复跑（uvicorn :8011 · concept/sz000858） | — | **Done**：SSE 含 warning 事件 + 结论带 `warning{PAGE_CAPTCHA_OVERLAY}` 标注 + 工单号 MOCK-31301BC5 + 截图 `app/static/shot_8b1b8439f2_1788957032290.png`（含覆盖层，D7 允许）；事件流 /tmp/fetch_d7_events.json |
+
+### D7 段坑与处置
+
+- 本会话 shell 的 `no_proxy` 残留 `[::1]`，httpx 解析报 `InvalidURL: Invalid port: ':1]'` → 首跑 embedding EMBED_FAILED；**净化须大小写两变量双写**（`NO_PROXY=localhost,127.0.0.1,::1 no_proxy=localhost,127.0.0.1,::1`）后复跑全绿——此坑建议关账时沉淀 wiki（由 00 裁定）。
+- 结论标注走「Schema 外附加字段」通道（pydantic v2 extra=ignore），对内 `app/services/rag/**` 零改动，边界遵守。
+- 验收勾选框未动（留 00 验收）；自检结论/实现备忘两处 ⏳ 标注已回填为 D7 口径实证。

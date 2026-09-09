@@ -234,6 +234,50 @@ def test_empty_chunks_yields_insufficient_info(client):
     assert conclusion["receipt"]["ticket_id"] == endpoint.issued_tickets[-1]
 
 
+# --- D7 warning 事件（滑块覆盖层检出放宽：警告但继续 · 第六类 SSE 事件） --------------
+
+
+def test_warning_event_passthrough_and_conclusion_annotation(client):
+    """acq 产出 warning（PAGE_CAPTCHA_OVERLAY）-> SSE warning 事件 + 结论标注 + 快照留痕。"""
+    runner, endpoint = make_rag_runner()
+    warning = {
+        "code": "PAGE_CAPTCHA_OVERLAY",
+        "message": "页面含验证覆盖层，结果已人工可复核",
+        "node": "fetch_page",
+    }
+    fastapi_app.state.acq_runner = lambda url: {
+        "payload": make_payload(url=url, n_chunks=1),
+        "warning": warning,
+    }
+    fastapi_app.state.rag_runner = runner
+    task_id = client.post("/api/task", json={"url": TARGET_URL}).json()["task_id"]
+    events = collect_sse(client, task_id)
+    # 第六类 SSE 事件透传（warning 非终态，管道继续推进至 Done）
+    warnings = [d for e, d in events if e == "warning"]
+    assert warnings == [warning]
+    assert states(events) == ["Pending", "Fetching", "Parsing", "RAGing", "Done"]
+    # 结论 JSON 带「验证覆盖层」标注（Schema 外附加字段，不动对内 schemas）
+    conclusion_event = [d for e, d in events if e == "conclusion"][0]
+    assert conclusion_event["conclusion"]["warning"]["code"] == "PAGE_CAPTCHA_OVERLAY"
+    assert "页面含验证覆盖层" in conclusion_event["conclusion"]["warning"]["message"]
+    # A5 闭环不受 warning 影响：工单号照常产出
+    assert conclusion_event["receipt"]["ticket_id"] == endpoint.issued_tickets[-1]
+    # 注册表快照留痕（断线补拉 / Step 1 数据源可见警告）
+    snapshot = fastapi_app.state.registry.snapshot(task_id)
+    assert snapshot["warning"]["code"] == "PAGE_CAPTCHA_OVERLAY"
+    assert snapshot["conclusion"]["warning"]["code"] == "PAGE_CAPTCHA_OVERLAY"
+
+
+def test_no_warning_path_conclusion_unannotated(client):
+    """无 warning 的正常路径：结论不带标注字段、无 warning 事件（零误报）。"""
+    task_id, _ = wire_success(client)
+    events = collect_sse(client, task_id)
+    assert [d for e, d in events if e == "warning"] == []
+    conclusion = [d for e, d in events if e == "conclusion"][0]["conclusion"]
+    assert "warning" not in conclusion
+    assert fastapi_app.state.registry.snapshot(task_id)["warning"] is None
+
+
 # --- A8 管理员「重新生成」：同一 Payload 重跑对内子图并刷新结论区 ---------------------
 
 

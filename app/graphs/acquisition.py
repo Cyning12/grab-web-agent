@@ -70,6 +70,7 @@ class AcquisitionState(TypedDict, total=False):
     blocks: list[dict[str, Any]]
     pre_chunks: list[dict[str, Any]]
     payload: dict[str, Any]
+    warning: dict[str, Any]  # D7：滑块覆盖层降级警告（code=PAGE_CAPTCHA_OVERLAY）
     error: dict[str, Any]
 
 
@@ -115,13 +116,23 @@ def make_nodes(fetcher: Any | None = None, embedder: Any | None = None) -> dict[
                 "screenshot_path": result.screenshot_path,  # 反爬截图留痕（SPEC FP-2）
                 "http_status": result.http_status,
             }
-        return {
+        out: dict[str, Any] = {
             "raw_dom": result.raw_dom,
             "http_status": result.http_status,
             "screenshot_path": result.screenshot_path,
             "anti_bot_flag": result.anti_bot_flag,
             "bbox_map": result.bbox_map,
         }
+        if getattr(result, "slider_overlay_flag", False):
+            # 人决 D7：滑块覆盖层检出但渲染探针通过 -> 警告但继续解析（不主动绕过验证）；
+            # warning 随 State 透传 Supervisor，由编排层发第六类 SSE 事件 + 结论标注
+            out["warning"] = {
+                "code": "PAGE_CAPTCHA_OVERLAY",
+                "message": "页面含验证覆盖层，结果已人工可复核",
+                "node": "fetch_page",
+            }
+            logger.warning("n2 验证覆盖层降级警告 url=%s", url)
+        return out
 
     def parse_dom(state: AcquisitionState) -> dict[str, Any]:
         """n3：BS4 + CSS 语义推断；空解析不降级多模态，以空 blocks 继续流转。"""
