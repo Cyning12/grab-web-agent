@@ -68,7 +68,7 @@
 | `/static/<path>` | GET | 截图落盘目录的静态托管，供 Step 1 缩略图与人工复核 | 【SPEC A6 · PRD §6.2 `screenshot_path`】 |
 | `/api/task/{id}/regenerate` | POST | 以同一已存 Payload 重跑对内子图，产出新结论并刷新 Step 3；**不回写旧结果** | 【SPEC A8 · T-RAG 范围「重新生成」行】 |
 
-**SSE 事件类型枚举**（`event:` 字段五类，数据均为 JSON）：
+**SSE 事件类型枚举**（`event:` 字段六类——五类基础 + D7 增 `warning`，数据均为 JSON）：
 
 | event | data 字段 | 触发时机 | 锚点 |
 |-------|-----------|----------|------|
@@ -76,7 +76,7 @@
 | `state` | `{status: Pending\|Fetching\|Parsing\|RAGing\|Done, detail?: string}` | 每次状态机迁移；终态含 `Done(回填失败)` 语义于 detail | 【PRD §6.3 · SPEC 范围 4】 |
 | `chunk` | `{index, title, text, section_path, xpath, token_count}` | Parsing 期间每产出一个已嵌入 chunk 即推一条（Step 2「实时展示」） | 【SPEC A3 · PRD §3.2 Step 2】 |
 | `conclusion` | `{conclusion: <结论JSON>, receipt: <回填回执>}` | 对内子图 Writeback 节点完成后推送一次（A5 闭环数据源） | 【SPEC A4/A5 · PRD §3.2 Step 3】 |
-| `warning`（D7 增 · 第六类） | `{code, message}` | 非致命异常（如页面含验证覆盖层但探针通过、降级截断 Top-K）；不中断流，前端横幅提示 | 【人决 D7 · task_fetch_render_wait_lite】 |
+| `warning`（D7 增 · 第六类） | `{code, message}` | 非致命异常（**当前唯一触发**：页面含验证覆盖层但渲染探针通过）；不中断流，前端横幅提示。Top-K 资源降级不入 warning（SPEC FP-6 用户无感知，仅日志） | 【人决 D7 · task_fetch_render_wait_lite】 |
 | `error` | `{code, message, retryable: bool}` | 任一 failure_paths 行触发、任务转终态 Error 时推送 | 【SPEC A9 · 六条 failure_paths】 |
 
 **任务注册表内存态结构**【SPEC FP-5「内存态可接受，须日志可查」· SPEC residual_risks ①】：
