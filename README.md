@@ -54,8 +54,19 @@ cp .env.example .env
 ```bash
 curl -i http://127.0.0.1:8000/api/health   # → 200 {"status":"ok"}
 curl -i http://127.0.0.1:5000/             # → 200 首屏 HTML
-.venv/bin/python -m pytest tests -q        # → 3 passed（health 200 / 首屏 200 / 图空跑）
+.venv/bin/python -m pytest tests -q        # → 104 passed（scaffold + 双子图 + 控制台联调）
 ```
+
+打开 `http://127.0.0.1:5000/`（管理员视角 `?role=admin`），输入目标 URL 点「开始调研」即可看到三区块渐进回填与底部工单回执。
+
+### 已知事项（真机 E2E 实测踩坑 · 2026-09-09）
+
+1. **NO_PROXY 含 `[::1]` 会导致 LLM/Embedding 调用炸 `InvalidURL`**（httpx2 解析 bracketed IPv6 缺陷）。启动服务前净化：
+   ```bash
+   export NO_PROXY=localhost,127.0.0.1,::1   # 去掉 [::1] 项
+   ```
+2. 东财个股页价格为 JS 异步渲染，首屏快照多为「-」占位，此时结论会如实输出 `insufficient_info=true`（铁律一：不降级多模态硬猜）。需要价格字段时给 fetch 节点加等待锚点（V1.x 候选）。
+3. live 冒烟默认关：置 `ACQ_LIVE_SMOKE=1` / `RAG_LIVE_SMOKE=1` 才会真实调用外网/SiliconFlow（会烧 Key 额度）。
 
 ## 工程结构（task_project_scaffold 底座）
 
