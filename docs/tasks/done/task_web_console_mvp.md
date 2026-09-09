@@ -1,6 +1,6 @@
 # Task：单页 Web 控制台 MVP —— 异步提交、SSE 进度与三步渐进式回填
 
-> **状态**：`draft`  
+> **状态**：`done`  
 > **关联图谱**：无（本仓尚无 `docs/_tech_graph/` flow 真值）  
 > **落盘**：`docs/tasks/active/task_web_console_mvp.md`；验收后 `git mv` → `docs/tasks/done/`
 
@@ -29,8 +29,8 @@
 | **wiki_delta_note** | `docs/coding_wiki/` 当前为空，无既有 wiki 页需更新；执行期沉淀的可复用经验于关账经验总结再评估晋升 |
 | **wiki_promotion** | `none` |
 | **related_pr** | （缺省 · 由 `gh pr view` 关联当前分支） |
-| **close_pr_policy** | `required` |
-| **close_pr_exempt_note** | （非 exempt，无需填写） |
+| **close_pr_policy** | `exempt` |
+| **close_pr_exempt_note** | V1 仅本地运行、无 PR 流（人决 D3 · 2026-09-09） |
 | **experience_capture** | `recommended` |
 | **experience_capture_note** | （非 not_applicable，无需填写） |
 | **kpi_rubric** | `KPI_RUBRIC_v1_2` |
@@ -55,16 +55,16 @@
 
 ## 范围
 
-- [ ] Flask 进程：渲染单页模板（输入框 + 按钮 + 三块回填区骨架），不含任何业务 API 端点
-- [ ] FastAPI 进程：`POST /api/task`（接收 URL，异步派发任务，立即返回任务 ID，不经 HTTP 长等待）+ `GET /api/task/{id}/stream` SSE 端点（推送进度 10% / 50% / 100% 与状态机迁移事件）
-- [ ] 状态机 Pending → Fetching → Parsing → RAGing → Done 经 SSE 可观测（PRD §6.3 / SPEC 范围 4）
-- [ ] Step 1 预览区：Fetching 完成后渲染整页截图缩略图（源自 Payload `screenshot_path`）+ 标题/Meta/HTTP 状态码
-- [ ] Step 2 知识切片区：实时展示 `pre_chunks`（每条含标题/正文片段，附 `section_path`/`xpath`）
-- [ ] Step 3 结论回填区：对内完成后渲染结构化结论卡片（竞品价格/风险等级/建议动作三字段）+ 回填状态回执
-- [ ] 闭环验证提示：回填成功时页面底部显示「已模拟写入内部系统（工单号：xxx）」，工单号与对内 Tool Node 回调一致（SPEC A5）
-- [ ] 界面层简易权限：URL 参数（如 `?role=admin`）最小实现——调研员视角仅见 Step 1+2；管理员视角可见 Step 3 且「重新生成」按钮可触发对内子图重跑并刷新结论区（SPEC A8）
-- [ ] SSE 断线重连：前端按任务 ID 自动重连并补拉当前状态，重连超上限提示刷新（SPEC failure_paths 第五行）
-- [ ] 失败可见性：任一失败路径触发时页面出现对应错误提示，任务状态不滞留中间态（SPEC A9）
+- [x] Flask 进程：渲染单页模板（输入框 + 按钮 + 三块回填区骨架），不含任何业务 API 端点
+- [x] FastAPI 进程：`POST /api/task`（接收 URL，异步派发任务，立即返回任务 ID，不经 HTTP 长等待）+ `GET /api/task/{id}/stream` SSE 端点（推送进度 10% / 50% / 100% 与状态机迁移事件）
+- [x] 状态机 Pending → Fetching → Parsing → RAGing → Done 经 SSE 可观测（PRD §6.3 / SPEC 范围 4）
+- [x] Step 1 预览区：Fetching 完成后渲染整页截图缩略图（源自 Payload `screenshot_path`）+ 标题/Meta/HTTP 状态码
+- [x] Step 2 知识切片区：实时展示 `pre_chunks`（每条含标题/正文片段，附 `section_path`/`xpath`）
+- [x] Step 3 结论回填区：对内完成后渲染结构化结论卡片（竞品价格/风险等级/建议动作三字段）+ 回填状态回执
+- [x] 闭环验证提示：回填成功时页面底部显示「已模拟写入内部系统（工单号：xxx）」，工单号与对内 Tool Node 回调一致（SPEC A5）
+- [x] 界面层简易权限：URL 参数（如 `?role=admin`）最小实现——调研员视角仅见 Step 1+2；管理员视角可见 Step 3 且「重新生成」按钮可触发对内子图重跑并刷新结论区（SPEC A8）
+- [x] SSE 断线重连：前端按任务 ID 自动重连并补拉当前状态，重连超上限提示刷新（SPEC failure_paths 第五行）
+- [x] 失败可见性：任一失败路径触发时页面出现对应错误提示，任务状态不滞留中间态（SPEC A9）
 
 ## 非范围
 
@@ -101,17 +101,17 @@
 
 ## 验收标准
 
-- [ ] 全量测试命令通过（本仓尚无 CI workflow；本 task `test_strategy=recommended`，30 至少落盘可执行的 E2E 演练脚本或手工验证清单并执行留痕）
-- [ ] `npx --yes dsh-coding-kit task lint-wiki-delta --target .` 通过（wiki_delta 预检 · 与 PR CI sample `run:` 行逐字一致）
-- [ ] **A1 异步提交与进度**：输入合法 URL 点击「开始调研」后前端不经 HTTP 超时即收到任务 ID；SSE 流中可依次观测 10% / 50% / 100% 进度事件与 Pending→Fetching→Parsing→RAGing→Done 状态迁移
-- [ ] **A2 Step 1**：Fetching 完成后预览区渲染整页截图缩略图 + 标题/Meta/HTTP 状态码
-- [ ] **A3 Step 2**：切片区实时展示 `pre_chunks`，每条含标题/正文片段且附 `section_path`/`xpath`
-- [ ] **A4 Step 3**：对内完成后结论区渲染结构化 JSON 结论卡片（竞品价格/风险等级/建议动作三字段），非纯文本报告
-- [ ] **A5 闭环（一票否决项）**：页面底部出现「已模拟写入内部系统（工单号：xxx）」，工单号非空且与对内 Tool Node 模拟回调返回值一致
-- [ ] **A8 权限最小实现**：无参/调研员视角 Step 3 不可见；`?role=admin` 视角可见 Step 3 且「重新生成」触发对内子图重跑并刷新结论区
-- [ ] **A9 失败可见性**：超时/反爬/回填失败三桩各演练一次，页面出现对应错误提示且任务落终态（Done(失败) 或 Error）
-- [ ] **SSE 断线演练**：任务进行中断开 SSE，前端自动重连并补拉当前状态；重连超上限提示刷新
-- [ ] **拓扑确认（审计观察项②）**：Flask 进程无任何 `/api/*` 路由；`POST /api/task` 与 SSE 端点仅存在于 FastAPI 进程（代码审查 + 路由清单断言）
+- [x] 全量测试命令通过（本仓尚无 CI workflow；本 task `test_strategy=recommended`，30 至少落盘可执行的 E2E 演练脚本或手工验证清单并执行留痕）—— 00 复核：合并后 main `pytest tests -q` = **104 passed, 2 skipped**（含 24 例联调 E2E）
+- [x] `npx --yes dsh-coding-kit task lint-wiki-delta --target .` 通过（wiki_delta 预检 · 与 PR CI sample `run:` 行逐字一致）—— 00 复核：**PASS**（scanned 4 · issues 0）
+- [x] **A1 异步提交与进度**：输入合法 URL 点击「开始调研」后前端不经 HTTP 超时即收到任务 ID；SSE 流中可依次观测 10% / 50% / 100% 进度事件与 Pending→Fetching→Parsing→RAGing→Done 状态迁移—— 00 **真机复核**：POST /api/task 立即返回 task_id；SSE 实测序列 Pending→Fetching(10%)→Parsing(50%)→RAGing→conclusion→(100%)→Done
+- [x] **A2 Step 1**：Fetching 完成后预览区渲染整页截图缩略图 + 标题/Meta/HTTP 状态码—— 00 复核：`test_web_console_sse.py` 快照/截图事件断言通过；真机任务截图落盘 app/static/
+- [x] **A3 Step 2**：切片区实时展示 `pre_chunks`，每条含标题/正文片段且附 `section_path`/`xpath`—— 00 **真机复核**：东财页实时产出 6 条 chunk 事件，每条含 section_path/xpath/token_count（1011 等，区间内）
+- [x] **A4 Step 3**：对内完成后结论区渲染结构化 JSON 结论卡片（竞品价格/风险等级/建议动作三字段），非纯文本报告—— 00 **真机复核**：conclusion 事件三字段齐全（competitor_price/risk_level/suggested_action）+ sources 命中内部语料 PDF
+- [x] **A5 闭环（一票否决项）**：页面底部出现「已模拟写入内部系统（工单号：xxx）」，工单号非空且与对内 Tool Node 模拟回调返回值一致—— 00 **真机复核（一票否决项通过）**：receipt.ticket_id=`MOCK-ABA46F6F` 非空且 status=success；`test_a5_closed_loop_ticket_matches_writeback_callback` 断言 ticket 与 OA 桩回调逐字一致
+- [x] **A8 权限最小实现**：无参/调研员视角 Step 3 不可见；`?role=admin` 视角可见 Step 3 且「重新生成」触发对内子图重跑并刷新结论区—— 00 复核：`test_web_console_api.py` 角色分流用例通过；30 实机冒烟（无参 vs ?role=admin）留痕
+- [x] **A9 失败可见性**：超时/反爬/回填失败三桩各演练一次，页面出现对应错误提示且任务落终态（Done(失败) 或 Error）—— 00 **真机复核**：首轮 E2E 实遇 EMBED_FAILED（本机 NO_PROXY 含 [::1] 触发 httpx2 解析缺陷）→ error 事件 + 终态 Error + 用户文案，A9 路径真实命中；三桩演练见联调测试
+- [x] **SSE 断线演练**：任务进行中断开 SSE，前端自动重连并补拉当前状态；重连超上限提示刷新—— 00 复核：`test_web_console_sse.py` 断线重连/历史回放补拉用例通过（registry Queue 广播 + 事件历史）
+- [x] **拓扑确认（审计观察项②）**：Flask 进程无任何 `/api/*` 路由；`POST /api/task` 与 SSE 端点仅存在于 FastAPI 进程（代码审查 + 路由清单断言）—— 00 复核：30 交付路由清单断言（Flask 零 /api/*），CORS 放行页面来源
 
 ---
 
@@ -240,13 +240,24 @@ PRD §3（新增核心章节）+ §8.2/8.3：控制台是用户唯一触点，�
 
 ### KPI（00）
 
-（`kpi_aggregator: CLOSE` · 关账回溯填写 · 至少一种可解析分数：`Task_KPI%: N` / D1–D5 表 / 四维 1–5）
+Task_KPI%: 100
+
+| 维度 | 评分 | 依据 |
+|------|------|------|
+| D1 闸完整性 | 5/5 | 双闸 approved · verify PASS · R1 审查文落盘 |
+| D2 验收覆盖 | 5/5 | 验收 11 项全勾；A5 一票否决经**真机端到端**复核（东财实页 + 真实 SiliconFlow + 工单 MOCK-ABA46F6F） |
+| D3 过程留痕 | 5/5 | invoke 10 / 30+40 合口径；真机 SSE 事件流留档 /tmp/sse_e2e.log |
+| D4 范围纪律 | 5/5 | 共享冻结零改动；SSE 零新依赖（纯 StreamingResponse） |
+| D5 测试制品 | 5/5 | 24 例联调（A5 闭环测试断言 ticket 与 OA 桩回调逐字一致） |
 
 ---
 
 ### 经验总结
 
-（`experience_capture: recommended` · 关账时建议回填 ≥80 字或 ≥3 条列表）
+（已回填 · 2026-09-09 CLOSE）
+- **真机 E2E 抓到了 mock 抓不到的坑**：本机 NO_PROXY 含 bracketed IPv6 项 `[::1]`，触发 openai/httpx2 客户端建代理路由表时 InvalidURL——单元测试全绿但真实调用必炸。教训：A5 级闭环验收必须有一次真实链路演练；该环境坑已写进 README 已知事项（启动前净化 NO_PROXY）。
+- 失败路径设计的价值被真实验证：EMBED_FAILED 按 failure_paths 落终态 Error + 用户文案，A9 不是纸面条文而是真扛住了事故。
+- 东财个股页价格字段为 JS 异步渲染，首屏快照多为「-」占位——结论 JSON 诚实输出 insufficient_info=true 而非编造价格，铁律一（不降级多模态硬猜）在真实数据下行为正确；如需价格字段，后续给 fetch 节点加 wait_for_selector 等待锚点（V1.x 候选）。
 
 ---
 
