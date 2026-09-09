@@ -1,6 +1,6 @@
 # Task：截图触发延迟加大与可配置（screenshot_delay）
 
-> **状态**：`draft`  
+> **状态**：`done`  
 > **关联图谱**：无  
 > **落盘**：`docs/tasks/active/task_screenshot_delay.md`；验收后 `git mv` → `docs/tasks/done/`
 
@@ -53,11 +53,11 @@
 
 ## 范围
 
-- [ ] 截图节点（或 fetch 截图触发点）前增加**可配置延迟**：env `SCREENSHOT_DELAY_MS`（默认值建议 3000–5000ms，30 实测定推荐默认），读取方式与 `FETCH_RENDER_TIMEOUT_MS` 同口径（模块内 os.getenv + 默认值）
-- [ ] 延迟插点须位于**渲染确认探针通过之后**（探针不过仍 ANTI_BOT，不空等）
-- [ ] `.env.example` 补录 `SCREENSHOT_DELAY_MS` 行（注释说明语义与推荐值）
-- [ ] 单测：mock 场景断言延迟被调用且时长取自 env；探针不过时**不发生**延迟空等
-- [ ] 真机复跑留痕：concept/sz000858 全管道，截图路径 + 工单号 + SSE 流写入实现备忘；00 人工看图复核蒙层改善
+- [x] 截图节点（或 fetch 截图触发点）前增加**可配置延迟**：env `SCREENSHOT_DELAY_MS`（默认值建议 3000–5000ms，30 实测定推荐默认），读取方式与 `FETCH_RENDER_TIMEOUT_MS` 同口径（模块内 os.getenv + 默认值）—— 00 复核通过
+- [x] 延迟插点须位于**渲染确认探针通过之后**（探针不过仍 ANTI_BOT，不空等）—— 00 复核通过
+- [x] `.env.example` 补录 `SCREENSHOT_DELAY_MS` 行（注释说明语义与推荐值）—— 00 复核通过
+- [x] 单测：mock 场景断言延迟被调用且时长取自 env；探针不过时**不发生**延迟空等—— 00 复核通过
+- [x] 真机复跑留痕：concept/sz000858 全管道，截图路径 + 工单号 + SSE 流写入实现备忘；00 人工看图复核蒙层改善—— 00 **人工看图复核**：shot_8b1b8439f2_1788961145303.png（2.1MB）主体全渲染、稳定可判读，顶部仅余小弹窗（D7 允许）；vs 基线 18KB 近空白图显著改善；工单 MOCK-805D21EE
 
 ## 非范围
 
@@ -79,11 +79,11 @@
 
 ## 验收标准
 
-- [ ] 全量测试命令通过（`.venv/bin/python -m pytest tests -q` 全绿，基线 122 collected = 120 passed + 2 skipped 不回退）
-- [ ] `npx --yes dsh-coding-kit task lint-wiki-delta --target .` 通过
-- [ ] **延迟单测**：mock 断言截图前延迟被调用、时长取自 env；非法值落默认；探针不过时无延迟空等
-- [ ] **env 断言**：`.env.example` 含 `SCREENSHOT_DELAY_MS` 且带注释
-- [ ] **真机复跑**：concept/sz000858 跑通 Pending→…→Done，工单号非空；截图供 00 人工看图（蒙层改善或稳定可判读）
+- [x] 全量测试命令通过（`.venv/bin/python -m pytest tests -q` 全绿，基线 122 collected = 120 passed + 2 skipped 不回退）—— 00 复核：合并后 main = **127 passed, 2 skipped**（基线 122 不回退，净增 7）
+- [x] `npx --yes dsh-coding-kit task lint-wiki-delta --target .` 通过—— 00 复核：PASS
+- [x] **延迟单测**：mock 断言截图前延迟被调用、时长取自 env；非法值落默认；探针不过时无延迟空等—— 00 复核：TestScreenshotDelay ×7（env 取值/非法落默认/anti_bot 不空等）随全量通过
+- [x] **env 断言**：`.env.example` 含 `SCREENSHOT_DELAY_MS` 且带注释—— 00 复核：.env.example 含 SCREENSHOT_DELAY_MS=5000 带注释
+- [x] **真机复跑**：concept/sz000858 跑通 Pending→…→Done，工单号非空；截图供 00 人工看图（蒙层改善或稳定可判读）—— 00 **人工看图复核**：shot_8b1b8439f2_1788961145303.png（2.1MB）主体全渲染、稳定可判读，顶部仅余小弹窗（D7 允许）；vs 基线 18KB 近空白图显著改善；工单 MOCK-805D21EE
 
 ---
 
@@ -136,13 +136,24 @@
 
 ### KPI（00）
 
-（`kpi_aggregator: CLOSE` · 关账回溯填写）
+Task_KPI%: 100
+
+| 维度 | 评分 | 依据 |
+|------|------|------|
+| D1 闸完整性 | 5/5 | 双闸 00 代签（授权在案）· R1 PASS · verify PASS |
+| D2 验收覆盖 | 5/5 | 验收 5 项全勾；真机行经 00 人工看图复核（2.1MB 全渲染 vs 基线 18KB 近空白，显著改善） |
+| D3 过程留痕 | 5/5 | invoke 10/30+40 齐；真机截图 + 工单 MOCK-805D21EE 留档 |
+| D4 范围纪律 | 5/5 | 5 文件 +184/-3 极小 diff；20 审观察项（条件化延迟）落实为强制 |
+| D5 测试制品 | 5/5 | 净增 7 用例零回退（127 passed） |
 
 ---
 
 ### 经验总结
 
-（`experience_capture: recommended` · 关账时建议回填）
+（已回填 · 2026-09-09 CLOSE）
+- 截图时机是「探针通过」≠「视觉稳定」：探针保证 DOM 非占位，但异步图片/弹窗需要时间稳定——5s 延迟（区间上限）实测把 18KB 近空白截图改善为 2.1MB 全渲染图。时序类参数必须 env 可配，站点差异大。
+- 「条件化延迟」（anti_bot 路径不空等）来自 20 审观察项升级为强制——失败路径的每一秒空等都是用户可感知的成本，审查观察项值得当阻塞级对待。
+- 蒙层只能改善不能根除（站点侧持续反爬），D7 警告横幅 + 人工可复核是 V1 的诚实终态；根除属 V2 代理池（PRD §9.1）。
 
 ---
 
