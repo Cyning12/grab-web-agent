@@ -1,6 +1,6 @@
 # Task：抓取渲染确认与极速版目标页切换（fetch_render_wait_lite）
 
-> **状态**：`draft`  
+> **状态**：`done`  
 > **关联图谱**：无（本仓尚无 `docs/_tech_graph/` flow 真值）  
 > **落盘**：`docs/tasks/active/task_fetch_render_wait_lite.md`；验收后 `git mv` → `docs/tasks/done/`
 
@@ -53,10 +53,10 @@
 
 ## 范围
 
-- [ ] fetch_page 节点增加**渲染完成确认**：`wait_for_load_state`（networkidle 优先，domcontentloaded 兜底）+ 关键内容选择器/非占位文本等待（超时阈值 env 可配，如 `FETCH_RENDER_TIMEOUT_MS`），确认通过才交 parse_dom
-- [ ] **滑块/验证码覆盖层检测**：识别「拖动下方滑块完成拼图」等东财验证特征 → 走 ANTI_BOT 失败路径（终态 Error + 用户文案），**禁止继续解析半成品页面**
-- [ ] 默认目标 URL 更新：`.env.example` `TASK_TARGET_URLS` 更新为 concept 极速版两条（sz000858 / sz300810）；README 演示步骤**新增/更新为** concept 极速版两条（README 现无东财 URL，仅 localhost 演示行，实为新增）；架构文档决策记录补 D4 修订注
-- [ ] 真机验收留痕：concept/sz000858 全管道复跑，SSE 事件流 + 截图路径 + 结论 JSON + 工单号写入实现备忘
+- [x] fetch_page 节点增加**渲染完成确认**：`wait_for_load_state`（networkidle 优先，domcontentloaded 兜底）+ 关键内容选择器/非占位文本等待（超时阈值 env 可配，如 `FETCH_RENDER_TIMEOUT_MS`），确认通过才交 parse_dom—— 00 复核：browser.py networkidle/domcontentloaded 兜底 + 非占位探针，FETCH_RENDER_TIMEOUT_MS env 可配
+- [x] **滑块/验证码覆盖层检测（人决 D7 口径）**：识别「拖动下方滑块完成拼图」等东财验证特征（含 iframe 补扫）→ 渲染探针通过则**降级为警告继续**（SSE `warning` + 结论标注），探针不通过才走 ANTI_BOT 终态 Error；**禁止主动绕过验证**
+- [x] 默认目标 URL 更新：`.env.example` `TASK_TARGET_URLS` 更新为 concept 极速版两条（sz000858 / sz300810）；README 演示步骤**新增/更新为** concept 极速版两条（README 现无东财 URL，仅 localhost 演示行，实为新增）；架构文档决策记录补 D4 修订注—— 00 复核：.env.example/README 已为 concept 双链
+- [x] 真机验收留痕：concept/sz000858 全管道复跑，SSE 事件流 + 截图路径 + 结论 JSON + 工单号写入实现备忘—— 00 复核：SSE 事件留档 /tmp/fetch_d7_events.json · 截图 shot_8b1b8439f2_1788957032290.png · 工单 MOCK-31301BC5 · 实现备忘已回填
 
 ## 非范围
 
@@ -79,8 +79,8 @@
 
 ## 验收标准
 
-- [ ] 全量测试命令通过（`.venv/bin/python -m pytest tests -q` 全绿不回退；实测基线口径：`pytest --collect-only` = **106 collected** = **104 passed + 2 skipped**（2026-09-09 10-task 实测），改动后 104 passed 不减少、skipped 不新增失败）
-- [ ] **旧测 grep 影响面**（K7 · 2026-09-09 10-task 实测 `grep -rn "sz000858|sz300810|eastmoney" tests/` = **10 文件 26 处**，逐文件处置如下）：
+- [x] 全量测试命令通过（`.venv/bin/python -m pytest tests -q` 全绿不回退；实测基线口径：`pytest --collect-only` = **106 collected** = **104 passed + 2 skipped**（2026-09-09 10-task 实测），改动后 104 passed 不减少、skipped 不新增失败）—— 00 复核：合并后 main `pytest tests -q` = **120 passed, 2 skipped**（collect 122；基线 116 零回退）
+- [x] **旧测 grep 影响面**（K7 · 2026-09-09 10-task 实测 `grep -rn "sz000858|sz300810|eastmoney" tests/` = **10 文件 26 处**，逐文件处置如下）：—— 00 复核：26 处逐条处置（改 4 / 保留 22），R2 复审员亲验计数吻合
   - `tests/test_web_console_sse.py`（1 处 · TARGET_URL 常量）→ **改为 concept 版 URL**（与 .env.example 默认对齐）
   - `tests/test_acquisition_pipeline.py`（9 处 · mock fetcher 失败注入 + live 冒烟）→ mock 失败注入用例**保留作 SSRF/失败注入语义**（mock 不联网，URL 仅参数）；`test_live_eastmoney` live 冒烟**参数化为 concept 版**（或维持 skipped 标注）
   - `tests/test_acquisition_url.py`（2 处 · URL 白名单用例）→ **保留**（concept URL 同域 quote.eastmoney.com，白名单语义不受影响）
@@ -89,11 +89,11 @@
   - `tests/test_acquisition_parser.py`（5 处 · HTML fixture 内 sz000858 文本）→ **保留不受影响**（解析 fixture 文本与目标 URL 无关）
   - `tests/test_acquisition_chunker.py`（1 处 · estimate_tokens("sz000858") 纯字符串）→ **保留不受影响**
   - 显式断言：新增渲染等待/滑块检测**不破坏既有 mock fetcher 失败注入用例**（ANTI_BOT / FETCH_TIMEOUT 现行断言口径不变）；改动后 104 passed 基线全量不回退仍成立
-- [ ] `npx --yes dsh-coding-kit task lint-wiki-delta --target .` 通过
-- [ ] **渲染等待单测**：mock page 对象断言 fetch 节点在内容就绪前不放行（wait 逻辑被调用、超时走 FETCH_TIMEOUT）
-- [ ] **滑块检测单测（人决 D7 口径）**：含「拖动下方滑块」特征 fixture + 探针通过 → **继续解析 + `warning` 事件 + 结论标注「页面含验证覆盖层」**；fixture + 探针不通过 → ANTI_BOT 终态 Error；正常 fixture 不误报
-- [ ] **默认 URL 断言**：`.env.example` 与 README 中目标 URL 为 `quote.eastmoney.com/concept/sz000858.html` 与 `concept/sz300810.html`
-- [ ] **真机 A5 复跑（人决 D7 口径）**：concept/sz000858 跑通 Pending→…→Done；截图允许含覆盖层（00 人工看图复核留痕即可），但结论 JSON 须带「验证覆盖层」警告标注、工单号非空
+- [x] `npx --yes dsh-coding-kit task lint-wiki-delta --target .` 通过—— 00 复核：**PASS**
+- [x] **渲染等待单测**：mock page 对象断言 fetch 节点在内容就绪前不放行（wait 逻辑被调用、超时走 FETCH_TIMEOUT）—— 00 复核：`test_acquisition_browser.py` 渲染等待用例随全量通过
+- [x] **滑块检测单测（人决 D7 口径）**：含「拖动下方滑块」特征 fixture + 探针通过 → **继续解析 + `warning` 事件 + 结论标注「页面含验证覆盖层」**；fixture + 探针不通过 → ANTI_BOT 终态 Error；正常 fixture 不误报—— 00 复核：D7 口径滑块用例 9 条通过（探针通过=警告继续 / 不过=ANTI_BOT / 不误报）
+- [x] **默认 URL 断言**：`.env.example` 与 README 中目标 URL 为 `quote.eastmoney.com/concept/sz000858.html` 与 `concept/sz300810.html`—— 00 复核：断言通过
+- [x] **真机 A5 复跑（人决 D7 口径）**：concept/sz000858 跑通 Pending→…→Done；截图允许含覆盖层（00 人工看图复核留痕即可），但结论 JSON 须带「验证覆盖层」警告标注、工单号非空—— 00 **真机复核（看图 + 事件流）**：20:30 跑 Pending→Fetching→**warning(PAGE_CAPTCHA_OVERLAY)**→Parsing→13 真实切片→RAGing→Done；结论带覆盖层标注；工单 MOCK-31301BC5；截图含覆盖层（D7 允许）已亲验
 
 ---
 
@@ -157,13 +157,25 @@ D7 续施工命令块（2026-09-09 30/40 同上下文）：
 
 ### KPI（00）
 
-（`kpi_aggregator: CLOSE` · 关账回溯填写）
+Task_KPI%: 95
+
+| 维度 | 评分 | 依据 |
+|------|------|------|
+| D1 闸完整性 | 5/5 | 双闸 00 代签（授权在案）· R1→R2→R3→R4 四轮审查全落盘 · verify PASS |
+| D2 验收覆盖 | 4/5 | 验收全勾；真机行按 D7 口径达成（Done+warning+工单号+看图）；扣分项：完全无滑块的干净会话截图因站点侧反爬不可得（非代码缺陷，残余风险①实锤） |
+| D3 过程留痕 | 5/5 | invoke 三段（10 补录 / 30+40 / D7 追记）；真机事件流 + 截图留档 |
+| D4 范围纪律 | 5/5 | 30 零越界（对内零改动 · config/requirements 冻结遵守；D7 人决的 scope 修订均留痕） |
+| D5 测试制品 | 5/5 | 净增 6 用例零回退（120 passed） |
 
 ---
 
 ### 经验总结
 
-（`experience_capture: recommended` · 关账时建议回填）
+（已回填 · 2026-09-09 CLOSE）
+- **人决 D7 的价值**：滑块是悬浮覆盖层而非内容拦截——「检出即拒」会误杀可解析页面。探针门控（非占位内容）+ 警告透传是更诚实的数据质量语义：用户看到警告横幅，结论可人工复核，与铁律一不冲突。
+- **iframe 是检测盲区**：东财滑块挂独立 iframe（websitecaptcha/slidervalid），主框架 DOM 扫描漏检——反爬/覆盖层检测必须扫 page.frames 子框架。
+- **NO_PROXY 净化须大小写双写**（NO_PROXY/no_proxy 都去 [::1]）：单写大写仍会被 httpx2 读到小写残留而 InvalidURL。30 建议沉淀 wiki——本行即留痕，wiki_delta 仍 none（单条坑记录于 README 已知事项已够）。
+- **审查迭代价值实证**：R1 拦下基线失实与影响面缺失、R3 拦下枚举头矛盾与越权例——四轮审查各拦住真问题， task 质量逐轮收敛。
 
 ---
 
