@@ -17,3 +17,7 @@
 
 - 00 代签授权：docs/harness/AUTHORIZATION_00_signoff_20260909.md（HG-TASK-DRAFT / HG-AUDIT-R1 均 00 代签）。
 - 本 invoke 由 00 补录（10-task 修订棒漏落盘，00 收口时发现并补齐，经验记入 task 经验总结候选）。
+<<<<<<< HEAD
+=======
+- 本文件由 30 从主仓（grab_web_agent 根 worktree）同名留档同步至本 worktree（pre-30 机械闸要求 invoke 随 task 同仓）。
+>>>>>>> task/fetch_render_wait_lite

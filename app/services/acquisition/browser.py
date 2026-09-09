@@ -1,7 +1,13 @@
-"""n2 fetch_page：Playwright 渲染抓取 + CDP Turbo 加速 + 反爬检测 + 截图落盘。
+"""n2 fetch_page：Playwright 渲染抓取 + CDP Turbo 加速 + 渲染完成确认 + 反爬检测 + 截图落盘。
 
 - 主路径为 Playwright 全量渲染（task R2 裁定 · PRD §4.1 锁定），超时阈值经
   ACQ_FETCH_TIMEOUT_MS 可配置；
+- 渲染完成确认（task_fetch_render_wait_lite）：goto 后 wait_for_load_state
+  （networkidle 优先 / domcontentloaded 兜底）+ 非占位文本等待，确认通过才交
+  parse_dom；等待超时抛 FetchTimeout（终态 Error）。阈值经 FETCH_RENDER_TIMEOUT_MS
+  可配置（本模块内 os.getenv 读取 · app/config.py 为共享冻结文件）；
+- 滑块/验证码覆盖层检测（东财「拖动下方滑块完成拼图」等特征）：title/URL 无特征
+  时补扫正文与 DOM，命中即 anti_bot_flag=True -> ANTI_BOT 终态，禁止解析半成品；
 - CDP Turbo：路由拦截丢弃 font/media 等大体积静态资源，仅保留 DOM/脚本/图片，
   换取渲染吞吐（收益未量化，V1 接受基线，见 task residual_risks）；
 - BoundingRect：渲染后 DOM 才有布局信息（架构 §1.3 n2 注），抓取阶段以
@@ -25,13 +31,40 @@ logger = logging.getLogger(__name__)
 
 _DEFAULT_STATIC_DIR = Path(__file__).resolve().parents[2] / "static"
 _DEFAULT_TIMEOUT_MS = 30000
+_DEFAULT_RENDER_TIMEOUT_MS = 10000
 _SETTLE_MS = 1200
+_CONTENT_READY_MIN_CHARS = 30
 
 # 反爬特征：HTTP 状态码 + 验证页标题/URL 特征（SPEC FP-2）
 _ANTI_BOT_STATUSES = {401, 403}
 _ANTI_BOT_PATTERN = re.compile(
     r"(captcha|verify|verification|security check|访问验证|安全验证|滑块|验证码)",
     re.IGNORECASE,
+)
+
+# 滑块/验证码覆盖层特征：东财「拖动下方滑块完成拼图」等软反爬（title/URL 无特征时
+# 补扫正文 innerText 与 DOM 组件签名；命中即 ANTI_BOT 终态，禁止解析半成品页面）
+_SLIDER_OVERLAY_PATTERN = re.compile(
+    r"(拖动下方滑块完成拼图|拖动左边滑块|拖动滑块|滑动滑块|滑块验证|滑块拼图|"
+    r"请完成安全验证|nc-container|nc_wrapper|geetest|slide-verify|滑块)",
+    re.IGNORECASE,
+)
+
+# 滑块组件常挂独立 iframe（东财实证：i.eastmoney.com/websitecaptcha/slidervalid），
+# 主框架 innerText/content 均扫不到，须按子框架 URL + 子框架正文补扫
+_CAPTCHA_FRAME_URL_PATTERN = re.compile(
+    r"(websitecaptcha|slidervalid|captcha|geetest)", re.IGNORECASE
+)
+
+# 非占位文本等待脚本：body 可见文本剔除空白与占位符（- — – _）后须达阈值，
+# 用于确认 JS 异步渲染真实完成（东财个股页未渲染时字段多为「-」占位）
+_CONTENT_READY_JS = (
+    "() => {"
+    "  const el = document.body;"
+    "  if (!el) return false;"
+    f"  const text = (el.innerText || '').replace(/[\\s\\-—–_]/g, '');"
+    f"  return text.length >= {_CONTENT_READY_MIN_CHARS};"
+    "}"
 )
 
 # 渲染后 DOM 的 xpath -> BoundingRect 采集脚本（xpath 规则与 parser.element_xpath 逐字对齐）
@@ -70,10 +103,15 @@ class PlaywrightFetcher:
     def __init__(
         self,
         timeout_ms: int | None = None,
+        render_timeout_ms: int | None = None,
         static_dir: str | Path | None = None,
     ) -> None:
         self.timeout_ms = timeout_ms or int(
             os.getenv("ACQ_FETCH_TIMEOUT_MS", str(_DEFAULT_TIMEOUT_MS))
+        )
+        # 渲染确认超时阈值（networkidle / 兜底 / 非占位文本等待共用 · env 可配）
+        self.render_timeout_ms = render_timeout_ms or int(
+            os.getenv("FETCH_RENDER_TIMEOUT_MS", str(_DEFAULT_RENDER_TIMEOUT_MS))
         )
         self.static_dir = Path(static_dir or os.getenv("ACQ_STATIC_DIR") or _DEFAULT_STATIC_DIR)
 
@@ -93,12 +131,14 @@ class PlaywrightFetcher:
                     response = page.goto(
                         url, wait_until="domcontentloaded", timeout=self.timeout_ms
                     )
+                    self._wait_for_render(page, url)  # 渲染完成确认：未通过即 FetchTimeout
                     page.wait_for_timeout(_SETTLE_MS)
                     http_status = response.status if response else 0
-                    anti_bot = self._detect_anti_bot(page, http_status)
-                    screenshot_path = self._save_screenshot(page, url)
-                    bbox_map = self._collect_bbox_map(page)
                     raw_dom = page.content()
+                    anti_bot = self._detect_anti_bot(page, http_status, raw_dom)
+                    screenshot_path = self._save_screenshot(page, url)
+                    # 反爬页无采集价值：命中滑块/验证即跳过 bbox 采集，仅截图留痕
+                    bbox_map = {} if anti_bot else self._collect_bbox_map(page)
                 finally:
                     browser.close()
         except PlaywrightTimeout as exc:
@@ -124,6 +164,46 @@ class PlaywrightFetcher:
             bbox_map=bbox_map,
         )
 
+    def _wait_for_render(self, page: Any, url: str) -> None:
+        """渲染完成确认：networkidle 优先 / domcontentloaded 兜底 + 非占位文本等待。
+
+        - networkidle 超时降级为 domcontentloaded 等待（不视为失败）；
+        - 非占位文本等待超时 -> FetchTimeout（终态 Error，失败路径第 2 行），
+          确认通过前不放行 parse_dom（task_fetch_render_wait_lite 范围第 1 行）。
+        """
+        from playwright.sync_api import TimeoutError as PlaywrightTimeout
+
+        try:
+            page.wait_for_load_state("networkidle", timeout=self.render_timeout_ms)
+        except PlaywrightTimeout:
+            logger.info(
+                "networkidle 等待超时，兜底 domcontentloaded url=%s timeout_ms=%d",
+                url,
+                self.render_timeout_ms,
+            )
+            try:
+                page.wait_for_load_state(
+                    "domcontentloaded", timeout=self.render_timeout_ms
+                )
+            except PlaywrightTimeout as exc:
+                logger.warning("渲染等待超时（load_state 兜底亦超时）url=%s", url)
+                raise FetchTimeout(
+                    f"目标页面抓取超时（渲染确认 {self.render_timeout_ms}ms）：{url}",
+                    url=url,
+                ) from exc
+        try:
+            page.wait_for_function(_CONTENT_READY_JS, timeout=self.render_timeout_ms)
+        except PlaywrightTimeout as exc:
+            logger.warning(
+                "渲染等待超时（非占位文本未就绪）url=%s timeout_ms=%d",
+                url,
+                self.render_timeout_ms,
+            )
+            raise FetchTimeout(
+                f"目标页面抓取超时（{self.render_timeout_ms}ms 内未渲染出有效内容）：{url}",
+                url=url,
+            ) from exc
+
     @staticmethod
     def _enable_cdp_turbo(page: Any) -> None:
         """CDP Turbo：路由拦截丢弃 font/media 资源（PRD §4.1 CDP Turbo 加速）。"""
@@ -137,8 +217,13 @@ class PlaywrightFetcher:
         page.route("**/*", _route_handler)
 
     @staticmethod
-    def _detect_anti_bot(page: Any, http_status: int) -> bool:
-        """403/401 状态码或验证页标题/URL 特征命中即判反爬（SPEC FP-2）。"""
+    def _detect_anti_bot(page: Any, http_status: int, raw_dom: str = "") -> bool:
+        """403/401 状态码、验证页标题/URL 特征或滑块覆盖层特征命中即判反爬（SPEC FP-2）。
+
+        滑块/验证码覆盖层（东财「拖动下方滑块完成拼图」等）常 200 + 正常 title，
+        故补扫正文 innerText 与 raw_dom 组件签名；命中即 ANTI_BOT 终态，
+        禁止继续解析半成品页面（task_fetch_render_wait_lite 范围第 2 行）。
+        """
         if http_status in _ANTI_BOT_STATUSES:
             return True
         try:
@@ -146,7 +231,43 @@ class PlaywrightFetcher:
         except Exception:
             title = ""
         final_url = page.url or ""
-        return bool(_ANTI_BOT_PATTERN.search(title) or _ANTI_BOT_PATTERN.search(final_url))
+        if _ANTI_BOT_PATTERN.search(title) or _ANTI_BOT_PATTERN.search(final_url):
+            return True
+        try:
+            body_text = (
+                page.evaluate("() => (document.body ? document.body.innerText : '')")
+                or ""
+            )
+        except Exception:
+            body_text = ""
+        if _SLIDER_OVERLAY_PATTERN.search(body_text) or _SLIDER_OVERLAY_PATTERN.search(
+            raw_dom
+        ):
+            return True
+        # 子框架补扫：滑块组件在 iframe 内（主框架 DOM/正文均不可见）
+        try:
+            frames = list(page.frames)[1:]
+        except Exception:
+            frames = []
+        for frame in frames:
+            try:
+                frame_url = frame.url or ""
+            except Exception:
+                frame_url = ""
+            if _CAPTCHA_FRAME_URL_PATTERN.search(frame_url):
+                return True
+            try:
+                frame_text = (
+                    frame.evaluate(
+                        "() => (document.body ? document.body.innerText : '')"
+                    )
+                    or ""
+                )
+            except Exception:  # 跨域子框架不可读时跳过（URL 特征已先行判定）
+                continue
+            if _SLIDER_OVERLAY_PATTERN.search(frame_text):
+                return True
+        return False
 
     def _save_screenshot(self, page: Any, url: str) -> str:
         """整页截图落盘 static_dir，返回 /static 相对路径（SPEC A6 可追溯）。"""
