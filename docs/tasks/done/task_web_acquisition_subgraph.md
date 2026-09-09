@@ -1,6 +1,6 @@
 # Task：对外子图 —— 网页采集、解析切分与标准 Payload 产出（Web Acquisition）
 
-> **状态**：`draft`  
+> **状态**：`done`  
 > **关联图谱**：无（本仓尚无 `docs/_tech_graph/` flow 真值）  
 > **落盘**：`docs/tasks/active/task_web_acquisition_subgraph.md`；验收后 `git mv` → `docs/tasks/done/`
 
@@ -29,8 +29,8 @@
 | **wiki_delta_note** | `docs/coding_wiki/` 当前为空，无既有 wiki 页需更新；执行期沉淀的可复用经验于关账经验总结再评估晋升 |
 | **wiki_promotion** | `none` |
 | **related_pr** | （缺省 · 由 `gh pr view` 关联当前分支） |
-| **close_pr_policy** | `required` |
-| **close_pr_exempt_note** | （非 exempt，无需填写） |
+| **close_pr_policy** | `exempt` |
+| **close_pr_exempt_note** | V1 仅本地运行、无 PR 流（人决 D3 · 2026-09-09） |
 | **experience_capture** | `recommended` |
 | **experience_capture_note** | （非 not_applicable，无需填写） |
 | **kpi_rubric** | `KPI_RUBRIC_v1_2` |
@@ -53,14 +53,14 @@
 
 ## 范围
 
-- [ ] Playwright 渲染抓取单 URL 页面（主路径），配合 CDP 协议 Turbo 加速；抓取超时阈值可配置
-- [ ] BeautifulSoup + CSS 语义推断提取正文、价格、标题、Meta 等字段，并为提取节点绑定 BoundingRect 坐标与 XPath
-- [ ] 按 H1/H2 标题层级语义切分清洗后文本为 `pre_chunks`，每块 512–1024 tokens，每块附 `section_path`（父级标题路径）与 `xpath`
-- [ ] 整页/视口截图落盘存储（仅留痕与人工复核，**不做任何像素级分析**），路径写入 Payload `screenshot_path`
-- [ ] 调用轻量 Embedding 模型为每个 chunk 生成文本向量，随 Payload 一并转交对内
-- [ ] 产出并校验符合 PRD §6.2 契约的标准 Payload（`url` / `screenshot_path` / `extracted_meta` / `pre_chunks[]`）
-- [ ] 目标 URL 协议白名单校验（仅 http/https；拒绝 file:// 与内网地址段，SSRF 防护）
-- [ ] 子图状态上报钩子：Fetching → Parsing 状态迁移事件供 Supervisor/SSE 消费
+- [x] Playwright 渲染抓取单 URL 页面（主路径），配合 CDP 协议 Turbo 加速；抓取超时阈值可配置
+- [x] BeautifulSoup + CSS 语义推断提取正文、价格、标题、Meta 等字段，并为提取节点绑定 BoundingRect 坐标与 XPath
+- [x] 按 H1/H2 标题层级语义切分清洗后文本为 `pre_chunks`，每块 512–1024 tokens，每块附 `section_path`（父级标题路径）与 `xpath`
+- [x] 整页/视口截图落盘存储（仅留痕与人工复核，**不做任何像素级分析**），路径写入 Payload `screenshot_path`
+- [x] 调用轻量 Embedding 模型为每个 chunk 生成文本向量，随 Payload 一并转交对内
+- [x] 产出并校验符合 PRD §6.2 契约的标准 Payload（`url` / `screenshot_path` / `extracted_meta` / `pre_chunks[]`）
+- [x] 目标 URL 协议白名单校验（仅 http/https；拒绝 file:// 与内网地址段，SSRF 防护）
+- [x] 子图状态上报钩子：Fetching → Parsing 状态迁移事件供 Supervisor/SSE 消费
 
 ## 非范围
 
@@ -88,15 +88,15 @@
 
 ## 验收标准
 
-- [ ] 全量测试命令通过（本仓尚无 CI workflow；30 须随实现落盘 `pytest tests -q` 等效测试入口并使其通过，后续 CI 接入时与仓 workflow 对齐）
-- [ ] `npx --yes dsh-coding-kit task lint-wiki-delta --target .` 通过（wiki_delta 预检 · 与 PR CI sample `run:` 行逐字一致）
-- [ ] **契约测试**：对本地静态测试页（含 H1/H2/价格 DOM）跑完整管道，产出的 Payload 通过 PRD §6.2 JSON Schema 校验（`url`/`screenshot_path`/`extracted_meta`/`pre_chunks[]` 字段齐全）
-- [ ] **切分断言**：每条 `pre_chunks` 块长 ∈ [512, 1024] tokens，且 `section_path` 与 `xpath` 字段非空
-- [ ] **截图断言**：`screenshot_path` 指向的截图文件真实落盘可读，且 Payload 中路径可追溯（SPEC A6）
-- [ ] **铁律一审计**：全流程日志 grep 无任何多模态/视觉模型调用记录（SPEC A6）
-- [ ] **SSRF 用例**：`file://`、内网 IP 段（如 10.x/172.16.x/192.168.x/127.x）URL 被拒绝并落日志（SPEC R4 安全用例）
-- [ ] **失败注入**：超时（慢响应桩）、反爬（403 桩）、空解析（空 body 桩）三条失败路径各一用例，断言状态终态 Error 与用户可见文案（SPEC R4-5）
-- [ ] 状态迁移事件 Fetching → Parsing 可被 Supervisor 层观测（供 SSE 进度 10%→50% 映射）
+- [x] 全量测试命令通过（本仓尚无 CI workflow；30 须随实现落盘 `pytest tests -q` 等效测试入口并使其通过，后续 CI 接入时与仓 workflow 对齐）—— 00 复核：合并后 main `pytest tests -q` = **80 passed, 2 skipped**（acq 59 含在内，scaffold/rag 回归无破坏）
+- [x] `npx --yes dsh-coding-kit task lint-wiki-delta --target .` 通过（wiki_delta 预检 · 与 PR CI sample `run:` 行逐字一致）—— 00 复核：scanned 4 · issues 0 · **PASS**
+- [x] **契约测试**：对本地静态测试页（含 H1/H2/价格 DOM）跑完整管道，产出的 Payload 通过 PRD §6.2 JSON Schema 校验（`url`/`screenshot_path`/`extracted_meta`/`pre_chunks[]` 字段齐全）—— 00 复核：`test_acquisition_pipeline.py` 本地静态页全管道 + §1.5 契约校验通过（自实现检查器，jsonschema 缺席已留痕实现备忘）
+- [x] **切分断言**：每条 `pre_chunks` 块长 ∈ [512, 1024] tokens，且 `section_path` 与 `xpath` 字段非空—— 00 复核：`test_acquisition_chunker.py` 块长区间 + section_path/xpath 非空断言通过
+- [x] **截图断言**：`screenshot_path` 指向的截图文件真实落盘可读，且 Payload 中路径可追溯（SPEC A6）—— 00 复核：截图落盘 `app/static/` 用例通过，路径入 Payload 可追溯
+- [x] **铁律一审计**：全流程日志 grep 无任何多模态/视觉模型调用记录（SPEC A6）—— 00 复核：铁律一日志审计用例通过（grep 无多模态调用）
+- [x] **SSRF 用例**：`file://`、内网 IP 段（如 10.x/172.16.x/192.168.x/127.x）URL 被拒绝并落日志（SPEC R4 安全用例）—— 00 复核：`test_acquisition_url.py` SSRF 24 例（含 127.1 短写/[::1]/file://）全拒并落日志
+- [x] **失败注入**：超时（慢响应桩）、反爬（403 桩）、空解析（空 body 桩）三条失败路径各一用例，断言状态终态 Error 与用户可见文案（SPEC R4-5）—— 00 复核：失败注入 ×3（超时/403/空 body）终态 Error + 用户文案断言通过
+- [x] 状态迁移事件 Fetching → Parsing 可被 Supervisor 层观测（供 SSE 进度 10%→50% 映射）—— 00 复核：Fetching→Parsing 状态钩子用例通过（progress=50 供 SSE 映射）
 
 ---
 
@@ -220,13 +220,24 @@ Embedding 模型具体选型（维度/中文能力）按 SPEC residual_risks 留
 
 ### KPI（00）
 
-（`kpi_aggregator: CLOSE` · 关账回溯填写 · 至少一种可解析分数：`Task_KPI%: N` / D1–D5 表 / 四维 1–5）
+Task_KPI%: 100
+
+| 维度 | 评分 | 依据 |
+|------|------|------|
+| D1 闸完整性 | 5/5 | 双闸 approved · verify PASS · R1 审查文落盘 |
+| D2 验收覆盖 | 5/5 | 验收 9 项全勾，00 逐项复核（80 passed · SSRF 24 例 · 失败注入 ×3） |
+| D3 过程留痕 | 5/5 | invoke 10 / 30+40 合口径；实现备忘记录 jsonschema 缺席与 token 近似估计两处裁量 |
+| D4 范围纪律 | 5/5 | 所有权边界零越界（唯一共享新增为包标记文件，add/add 冲突已由 00 合并解决） |
+| D5 测试制品 | 5/5 | 5 测试文件 59 用例，单测零真实浏览器/外网 |
 
 ---
 
 ### 经验总结
 
-（`experience_capture: recommended` · 关账时建议回填 ≥80 字或 ≥3 条列表）
+（已回填 · 2026-09-09 CLOSE）
+- DI 可注入设计（fetcher/embedder 注入）让「单测零真实浏览器/外网」成立：59 用例全离线，live 冒烟由 ACQ_LIVE_SMOKE 旗标隔离——对外棒的测试模式应与对内棒（RAG_LIVE_SMOKE）保持同一约定，后续 task 沿用。
+- jsonschema 缺席时 30 选择自实现契约检查器并留痕实现备忘，而非擅自加依赖——「共享文件冻结 + 申报通道」纪律保护了双轨并行；00 合并时仅需处理一处 add/add 包标记冲突，成本可控。
+- SSRF 防护白名单（http/https + 拒内网段）在 URL 校验入口钉死，24 个边界用例（含 127.1 短写、[::1]）证明校验不能只做前缀匹配——安全类验收应枚举畸形输入。
 
 ---
 
