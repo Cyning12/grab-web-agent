@@ -105,7 +105,7 @@
 ## 给执行帽的必读列表
 
 1. `AGENTS.md` · `docs/meta/PROJECT_CONFIG_*.md`（若存在）
-2. 关联 SPEC：`docs/spec/SPEC-web-research-agent_v1.md`（已签收 · 范围第 2 条 / A4/A5/A7 / failure_paths / R3 铁律三边界）
+2. 关联 SPEC：`docs/spec/web-research-agent/SPEC-web-research-agent_v1.md`（已签收 · 范围第 2 条 / A4/A5/A7 / failure_paths / R3 铁律三边界）
 3. PRD 真值：`docs/spec/_source/PRD_web_research_agent_v2.md` §5、§6.2、§8.3
 4. 审计观察项：`docs/harness/reviews/spec_web-research-agent_audit_R1_20260909.md` 观察项 1（A7 阈值钉死，已吸收进本 task 验收）
 5. 并行轨 task：`./task_web_acquisition_subgraph.md`（Payload 契约产出方）、`./task_web_console_mvp.md`（结论 Schema 消费方）

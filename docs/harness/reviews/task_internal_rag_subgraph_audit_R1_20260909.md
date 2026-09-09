@@ -4,7 +4,7 @@
 |----|-----|
 | 审查 hat | 20-task-audit（R1 · 书面审） |
 | 被审 task | `docs/tasks/active/task_internal_rag_subgraph.md`（slug: `internal_rag_subgraph`） |
-| 对照真值 | `docs/spec/SPEC-web-research-agent_v1.md`（signed · HG-SPEC-SIGNOFF=approved）+ `docs/spec/_source/PRD_web_research_agent_v2.md` |
+| 对照真值 | `docs/spec/web-research-agent/SPEC-web-research-agent_v1.md`（signed · HG-SPEC-SIGNOFF=approved）+ `docs/spec/_source/PRD_web_research_agent_v2.md` |
 | 结构真值 | `docs/harness/templates/TASK_TEMPLATE.md` |
 | 前置 | HG-TASK-DRAFT=approved ✅（task 人工闸表） |
 | 审查日期 | 2026-09-09 |
