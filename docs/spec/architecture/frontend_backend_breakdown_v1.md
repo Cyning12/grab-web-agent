@@ -222,7 +222,8 @@ Receipt = {                             // 回填回执（随 conclusion 事件�
 - **限额**：对内子图运行于 2 核 4G 资源盒【铁律三 · SPEC A7】；钉死值 = `docker run --cpus=2 --memory=4g`（或等效 cgroup），每 1s 采样 RSS（`/proc/<pid>/status` VmRSS 或 `docker stats`），**峰值 ≤ 3072MB**，采样原始数据留档【T-RAG 验收 A7 行 · 审计观察项①】。
 - **进程归属（设计决策，不冲突）**：V1 单容器双进程——Flask（渲染）+ FastAPI（API/SSE + Supervisor + 双子图同进程 asyncio 执行）；A7 采样对象为运行对内子图的 FastAPI 进程（docker stats 容器视图兜底；macOS 无 /proc 的等效采样属 30 制品）【PRD §2.3 · T-WEB 进程拓扑 · T-RAG residual_risks ③】。
 - **降级手段唯一**：内存逼近阈值 → 截断 Top-K，禁止引入常驻重服务（Qdrant 等独立服务进程 V1 不引入）【SPEC FP-6 · SPEC R3 铁律三边界 · T-RAG 非范围】。
-- **LLM**：POC 期外部 API，Key 不落盘明文【SPEC R3 建议项 · T-RAG 非范围】。
+- **LLM**：POC 期外部 API，Key 不落盘明文【SPEC R3 建议项 · T-RAG 非范围】；服务商钉死 **SiliconFlow**（人决 D2 · 见 §5 决策记录），对内结论生成与 Embedding 均走其 API（调用即出域，不占本地 2核4G 配额，与铁律三兼容）。
+- **运行形态**：V1 **仅本地运行**，不考虑发布/上线（人决 D3）；A7 验收仍按 docker 限额执行（本地 docker 即可），容器镜像发布、CI 部署管线均为非目标。
 
 ---
 
@@ -306,9 +307,20 @@ Flask 仅交付首屏 HTML 骨架（输入框 + 「开始调研」按钮 + 三�
 
 ---
 
+## 5. 决策记录（2026-09-09 人决 · 00 落盘）
+
+| # | 决策 | 结论 | 理由 / 影响面 |
+|---|------|------|---------------|
+| D1 | 前后端是否分库 | **否 · 单仓 monorepo**：`git@github.com:Cyning12/grab-web-agent.git` | PRD §2.2 双轨是**子图/模块级**解耦而非仓库级；前端仅 Flask 模板 + vanilla JS（§2.1），无独立构建链；本地运行（D3）无分库收益。V2 前端独立 SPA 时再议 |
+| D2 | LLM / Embedding API 服务商 | **SiliconFlow** | 对内结论生成（with_structured_output）+ 对外/对内 Embedding 统一走 SiliconFlow API；`SILICONFLOW_API_KEY` 经环境变量注入、不落盘明文【T-RAG 非范围】；具体模型选型（生成 / Embedding 各一）为 30 开工第一个人工确认项（原 SPEC residual_risks ④ 的落点） |
+| D3 | 发布/部署 | **V1 仅本地运行**，不考虑发布 | §1.6 部署节降级为本地拓扑说明；A7 docker 限额验收保留（本地 docker 可执行）；远程仓仅作代码备份/协作，不配 CI 部署 |
+
+---
+
 ## 修订记录
 
 | 日期 | 说明 |
 |------|------|
 | 2026-09-09 | 00 起草极简壳（无初稿第一步） |
 | 2026-09-09 | 10-spec 帽全量回填：§0 拓扑一图流 · §1 后端（API/SSE 枚举/注册表 + Supervisor + 双子图节点三行式）· §1.5 契约（Payload 字段表/结论 Schema/状态机触发表）· §1.6 资源部署 · §2 前端三区块与 SSE 重连 · §3 端到端时序（含 A5 闭环与失败分支）· §4 铁律映射；一致性自检无冲突；状态 draft-shell → draft |
+| 2026-09-09 | 00 落盘人决 D1–D3（§5 决策记录）：单仓 monorepo · SiliconFlow · V1 仅本地运行；§1.6 同步修订 |
