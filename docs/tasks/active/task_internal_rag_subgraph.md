@@ -109,7 +109,8 @@
 3. PRD 真值：`docs/spec/_source/PRD_web_research_agent_v2.md` §5、§6.2、§8.3
 4. 审计观察项：`docs/harness/reviews/spec_web-research-agent_audit_R1_20260909.md` 观察项 1（A7 阈值钉死，已吸收进本 task 验收）
 5. 并行轨 task：`./task_web_acquisition_subgraph.md`（Payload 契约产出方）、`./task_web_console_mvp.md`（结论 Schema 消费方）
-6. `docs/standards/CODING_*_L2`（若仓内存在则必读；当前缺失时按仓通用编码约定执行）
+6. 工程底座 task：`./task_project_scaffold.md`（**前置依赖**：本 task 的 30 在 scaffold 交付的目录槽位与 stub 节点内填实现，不再动工程骨架；`company/` 语料目录约定见人决 D6）
+7. `docs/standards/CODING_*_L2`（若仓内存在则必读；当前缺失时按仓通用编码约定执行）
 
 ---
 

@@ -106,7 +106,8 @@
 2. 关联 SPEC：`docs/spec/SPEC-web-research-agent_v1.md`（已签收 · 范围第 1 条 / A2/A3/A6 / failure_paths）
 3. PRD 真值：`docs/spec/_source/PRD_web_research_agent_v2.md` §4、§6.2、§1.2
 4. 并行轨 task：`./task_internal_rag_subgraph.md`（Payload 契约消费方）、`./task_web_console_mvp.md`（Payload 展示方）
-5. `docs/standards/CODING_*_L2`（若仓内存在则必读；当前缺失时按仓通用编码约定执行）
+5. 工程底座 task：`./task_project_scaffold.md`（**前置依赖**：本 task 的 30 在 scaffold 交付的目录槽位与 stub 节点内填实现，不再动工程骨架）
+6. `docs/standards/CODING_*_L2`（若仓内存在则必读；当前缺失时按仓通用编码约定执行）
 
 ---
 

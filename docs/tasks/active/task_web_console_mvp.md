@@ -122,7 +122,8 @@
 3. PRD 真值：`docs/spec/_source/PRD_web_research_agent_v2.md` §3、§6.1、§6.3、§8.2/8.3
 4. 审计观察项：`docs/harness/reviews/spec_web-research-agent_audit_R1_20260909.md` 观察项 2（进程拓扑，已钉死为「Flask 仅渲染、API/SSE 全走 FastAPI」）
 5. 并行轨 task：`./task_web_acquisition_subgraph.md`（Payload 契约）、`./task_internal_rag_subgraph.md`（结论 Schema 与工单号回调）
-6. `docs/standards/CODING_*_L2`（若仓内存在则必读；当前缺失时按仓通用编码约定执行）
+6. 工程底座 task：`./task_project_scaffold.md`（**前置依赖**：FastAPI/Flask 入口、目录槽位、三图 stub 均由 scaffold 交付；本 task 的 30 在槽位内填实现）
+7. `docs/standards/CODING_*_L2`（若仓内存在则必读；当前缺失时按仓通用编码约定执行）
 
 ---
 
