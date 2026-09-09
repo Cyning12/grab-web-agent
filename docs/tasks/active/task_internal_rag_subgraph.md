@@ -166,8 +166,8 @@ PRD §5 + SPEC 范围第 2 条：对内子图是「读取+回写」轨，职责�
 
 | 项 | 状态 | 备注 |
 |----|------|------|
-| 30 实现 | ⏳ | |
-| 40 自检 | ⏳ | |
+| 30 实现 | ✅ | `app/graphs/internal_rag.py` 四节点填实 + `app/services/rag/`（schemas/retriever/generator/writeback/resources）新建；Retriever Protocol 抽象封闭 FAISS；生成=with_structured_output 等效（json_object+Pydantic 强校验，重试总尝试 ≤2）；回填=内存模拟 OA 桩（成功/500） |
+| 40 自检 | ✅ | `pytest tests -q` → 24 passed, 1 skipped（live 冒烟默认关）；lint-wiki-delta PASS；verify PASS；A7 RSS 峰值 126.42MB ≤ 3072MB（psutil 等效采样，原始数据留档 invokes 目录） |
 
 ---
 
@@ -181,7 +181,21 @@ PRD §5 + SPEC 范围第 2 条：对内子图是「读取+回写」轨，职责�
 
 ### 自检结论（执行者）
 
-（30/40 回填）
+**命令块**（cwd = worktree `.worktrees/rag` · 解释器 = 主仓 `.venv/bin/python`）：
+
+| 命令 | 退出码 | 关键输出 |
+|------|--------|----------|
+| `python -m pytest tests -q` | 0 | `24 passed, 1 skipped, 1 warning in 0.36s`（1 skipped = live 冒烟 `RAG_LIVE_SMOKE=1` 默认关） |
+| `npx --yes dsh-coding-kit@1.10.0 task lint-wiki-delta --target .` | 0 | `LINT-WIKI-DELTA: PASS`（scanned 4 · issues 0） |
+| `npx --yes dsh-coding-kit@1.10.0 verify --task docs/tasks/active/task_internal_rag_subgraph.md` | 0 | `VERIFY: PASS`（HG-TASK-DRAFT / HG-AUDIT-R1 均 approved） |
+| A7 RSS 采样（pytest 内 RssSampler · 间隔 50ms 严于 1s 要求） | 0 | 样本 2 个 · 峰值 **126.42MB ≤ 3072MB** · 原始数据 `docs/harness/invokes/by-task/internal_rag_subgraph/rss_samples_internal_rag.json` |
+| 语料离线实测（load_corpus + FAISS 伪向量构建，零外网） | 0 | company/ 提取 400 切片（pypdf 中文正常）· 标量过滤 company_code=000858 命中 |
+
+**验收表摘要**（逐条 · 勾选框留 00）：全量测试通过 ✅；lint-wiki-delta ✅；结论三字段+Schema 校验 ✅（`test_happy_path_conclusion_schema_and_three_fields`）；Tool Node 工单号闭环一致 ✅；禁 Rerank/禁本地 Embedding 模型审计 ✅（tokenize 级 `test_internal_rag_audit.py`）；空 chunks 信息不足 ✅；回填 500 桩保结论+Done(回填失败) ✅；A7 峰值达标 ✅（**docker 不可用 → psutil 等效采样**，task residual_risks ③ 允许，特此注明）；降级截断 Top-K+降级日志 ✅；同 Payload 重跑新结论不回写旧结果 ✅；RAGing→Done 事件钩子 ✅。
+
+**已知未测项**：live 冒烟（真实 SiliconFlow API）默认关未跑；全量 company/ PDF 真实 bge-m3 索引属 live 手测路径。
+
+**共享文件改动请求（待 00 合并，本轮未动）**：`requirements.txt` += `psutil==7.2.2`、`pypdf==6.18.0`（已临时装入主仓 venv）；`.env.example` 可补 RAG_TOP_K / RAG_TOP_K_DEGRADED / RAG_RSS_DEGRADE_MB / RAG_RSS_PEAK_LIMIT_MB 四个可选变量（代码内默认值兜底）。
 
 ---
 
