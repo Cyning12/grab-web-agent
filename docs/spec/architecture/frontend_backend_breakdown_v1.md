@@ -318,6 +318,7 @@ Flask 仅交付首屏 HTML 骨架（输入框 + 「开始调研」按钮 + 三�
 | D4 | MVP 验证场景 | **实时股票页抓取（对外）+ 财报内部文档（对内）** | 对外目标页 ×2：`https://quote.eastmoney.com/sz000858.html`（五粮液）、`https://quote.eastmoney.com/sz300810.html`（中科海讯）；对内语料来源：巨潮全文检索（五粮液 / 中科海讯），样例已人工保存。SPEC 通用「竞品/行业调研」表述的场景实例化，非范围变更。**D4 修订注（2026-09-09 · task_fetch_render_wait_lite）**：真机验收发现标准页触发滑块验证且字段 JS 异步未渲染即解析，对外目标页默认切换为 concept 极速版 `https://quote.eastmoney.com/concept/sz000858.html` / `https://quote.eastmoney.com/concept/sz300810.html`（`.env.example` TASK_TARGET_URLS 同步）；fetch 节点增加渲染完成确认 + 滑块覆盖层检出（ANTI_BOT 终态） |
 | D5 | SiliconFlow 模型选型 | 生成：`deepseek-ai/DeepSeek-V4-Flash`；Embedding：`bge-m3`（BAAI/bge-m3） | 人决（P2 闭环）；全部经 `.env` 可配置，不落盘明文 Key；30 施工以 env 变量名为唯一引用 |
 | D6 | 内部语料目录约定 | `company/` 按**上市编号**命名区分（如 `company/sz000858/`、`company/sz300810/`） | 样例已人工保存；**后续**补抓取脚本（cninfo 全文检索 → 按编号落盘），单独立 task，不占本批 30 范围 |
+| D6-修订 | 语料目录命名口径 | **统一裸 6 位编号**（`company/000858/`、`company/300810/`），废弃 sz 前缀写法 | 20 审实证：磁盘样例为裸号、retriever derive_company_code 剥前缀产出裸号，sz 前缀会致语料分裂 + 标量过滤静默失效；用户原话「按上市编号」即裸号。抓取脚本入参 sz000858/000858 均归一为裸 6 位（task_cninfo_corpus_scraper 同步修订） |
 | D7 | 滑块检出语义 | **放宽为「警告但继续」**：渲染确认探针通过（内容非占位）则继续解析，结论标注「页面含验证覆盖层」，SSE 增 `warning` 事件；探针不通过才 ANTI_BOT 终态 | 真机实证：滑块为悬浮覆盖层、背景 DOM 已完整渲染（截图 ×2 00 亲验）；严格拦截在本机 IP 持续被反爬时不可达 Done。不主动绕过验证（V2 反爬仍排除） |
 
 ---

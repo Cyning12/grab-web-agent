@@ -29,7 +29,7 @@
 | **wiki_delta_note** | 单脚本交付，经验入 task 经验总结 |
 | **wiki_promotion** | `none` |
 | **related_pr** | （无 · D3） |
-| **close_pr_policy** | `exempt** |
+| **close_pr_policy** | `exempt` |
 | **close_pr_exempt_note** | V1 仅本地运行、无 PR 流（人决 D3） |
 | **experience_capture** | `recommended` |
 | **experience_capture_note** | （非 not_applicable） |
@@ -47,13 +47,13 @@
 
 ## 背景与目标
 
-人决 D6（2026-09-09）：内部语料来源为巨潮资讯全文检索（cninfo），样例已人工保存于 `company/`；需补一个**抓取脚本**，按**上市编号**命名区分、自动落盘。完成态 = 一条命令 `python -m scripts.fetch_cninfo sz000858 sz300810` 把两家公司的定期报告（年报/半年报优先）PDF 抓取到 `company/sz000858/`、`company/sz300810/`，对内子图 FAISS 检索可直接消费。
+人决 D6 + D6-修订（2026-09-09 · 20 审实证裁定）：内部语料来源为巨潮资讯（cninfo）公告查询，样例已人工保存于 `company/`（磁盘实有 `000858/`、`300810/` 裸号目录）；需补一个**抓取脚本**，按**上市编号裸 6 位**命名区分、自动落盘（sz/sh 前缀废弃——retriever derive_company_code 剥前缀产出裸号，前缀致语料分裂 + 标量过滤静默失效）。完成态 = 一条命令 `python -m scripts.fetch_cninfo 000858 300810` 把两家公司的定期报告（年报/半年报优先）PDF 抓取到 `company/000858/`、`company/300810/`，对内子图 FAISS 检索可直接消费。
 
 ---
 
 ## 范围
 
-- [ ] `scripts/fetch_cninfo.py` CLI：入参 = 一个或多个上市编号（如 sz000858 / sz300810 或 000858）；按编号建目录 `company/<code>/` 落盘 PDF
+- [ ] `scripts/fetch_cninfo.py` CLI：入参 = 一个或多个上市编号（接受 `sz000858` / `000858` 等写法，**归一化为裸 6 位**——剥前缀正则 `^(sz|sh|bj)` 不区分大小写，非法编号报错不建目录）；按裸号建目录 `company/<6位code>/` 落盘 PDF
 - [ ] 抓取源：cninfo 公告查询接口（30 实测选型：hisAnnouncement 查询 API 优先于全文检索页爬取；纯 httpx，**不引入 Playwright**）；过滤定期报告类目（年报/半年报），每公司默认最新 N 份（N env 或参数可配，默认 2）
 - [ ] 礼貌抓取：请求间隔 + User-Agent；失败单文件跳过不中断整批
 - [ ] README 增「语料更新」节：命令照抄可执行
@@ -82,10 +82,10 @@
 
 ## 验收标准
 
-- [ ] 全量测试命令通过（基线 129 collected = 127 passed + 2 skipped 不回退，20 审实测复核）
+- [ ] 全量测试命令通过（**钉死**：`.venv/bin/python -m pytest tests -q` 仓根执行；基线 129 collected = 127 passed + 2 skipped 不回退，20 审实测复核）
 - [ ] `npx --yes dsh-coding-kit task lint-wiki-delta --target .` 通过
 - [ ] **CLI 单测**：mock 下双编号跑通，目录/命名/跳过语义断言；零外网
-- [ ] **真机验收（一票否决级）**：`python -m scripts.fetch_cninfo sz000858 sz300810` 实跑 exit 0，`company/sz000858/` 与 `company/sz300810/` 各 ≥1 份 PDF，pypdf 提取文本非空
+- [ ] **真机验收（一票否决级）**：`python -m scripts.fetch_cninfo 000858 300810` 实跑 exit 0，`company/000858/` 与 `company/300810/` 各 ≥1 份 PDF，pypdf 提取文本非空
 - [ ] **README 断言**：含语料更新命令节
 
 ---
@@ -169,3 +169,4 @@ mock 单测 + 真机双编号抓取（一票否决）+ README 节。
 | 日期 | 说明 |
 |------|------|
 | 2026-09-09 | 00 起草初版（人决 D6 兑现 · 长程 goal ②） |
+| 2026-09-09 | 20 R1 RETURN 修订（00 代行 10-task）：B1 命名口径统一裸 6 位（D6-修订）+ 入参归一规则 + exempt 笔误 + pytest 命令钉死，送 R2 |
