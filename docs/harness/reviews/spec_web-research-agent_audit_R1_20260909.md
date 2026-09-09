@@ -3,7 +3,7 @@
 > **审查文**：`spec_web-research-agent_audit_R1_20260909.md`
 > **审查者**：20-spec-audit（书面审查 · 不代签）
 > **日期**：2026-09-09
-> **被审对象**：[`docs/spec/web-research-agent/SPEC-web-research-agent_v1.md`](../../../spec/web-research-agent/SPEC-web-research-agent_v1.md)（draft · R0–R5 已回填）
+> **被审对象**：[`docs/spec/web-research-agent/SPEC-web-research-agent_v1.md`)](../../spec/web-research-agent/SPEC-web-research-agent_v1.md)（draft · R0–R5 已回填）
 > **对照真值**：[`docs/spec/_source/PRD_web_research_agent_v2.md`](../../spec/_source/PRD_web_research_agent_v2.md)（PRD V2.0 原文）
 > **审查方式**：轻量单轮 R1（10-spec 思考轮已充分回填，符合轻量路径条件）
 

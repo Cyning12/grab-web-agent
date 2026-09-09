@@ -81,7 +81,7 @@
 
 ## 依赖
 
-- 上位真值：[`docs/spec/web-research-agent/SPEC-web-research-agent_v1.md`](../../spec/web-research-agent/SPEC-web-research-agent_v1.md)（signed）· [`docs/spec/architecture/frontend_backend_breakdown_v1.md`](../spec/architecture/frontend_backend_breakdown_v1.md)（含 §5 决策 D1–D6）
+- 上位真值：[`docs/spec/web-research-agent/SPEC-web-research-agent_v1.md`](../../spec/web-research-agent/SPEC-web-research-agent_v1.md)（signed）· [`docs/spec/architecture/frontend_backend_breakdown_v1.md`](../../spec/architecture/frontend_backend_breakdown_v1.md)（含 §5 决策 D1–D6）
 - 下游消费方（**反向依赖**，本 task 是它们的前置公共底座，依赖节须被三 task 反向引用——本 task 不改那三个文件，由 00 统一回填）：[`task_web_acquisition_subgraph.md`](./task_web_acquisition_subgraph.md) · [`task_internal_rag_subgraph.md`](./task_internal_rag_subgraph.md) · [`task_web_console_mvp.md`](./task_web_console_mvp.md)
 - 语料目录：`company/`（D6 既定目录，样例已人工保存；本 task 仅在 `.gitignore`/`.env.example` 层面对齐 `COMPANY_DIR`，不动语料文件）
 
@@ -119,7 +119,7 @@
 
 1. `AGENTS.md` · `docs/meta/PROJECT_CONFIG_*.md`（若存在）
 2. 关联 SPEC：[`docs/spec/web-research-agent/SPEC-web-research-agent_v1.md`](../../spec/web-research-agent/SPEC-web-research-agent_v1.md)（已签收 · 范围/非范围/A1–A9/failure_paths）
-3. 架构真值：[`docs/spec/architecture/frontend_backend_breakdown_v1.md`](../spec/architecture/frontend_backend_breakdown_v1.md)（**全文**，重点 §0 拓扑 · §1.2–1.4 图节点三行式 · §5 决策 D1–D6）
+3. 架构真值：[`docs/spec/architecture/frontend_backend_breakdown_v1.md`](../../spec/architecture/frontend_backend_breakdown_v1.md)（**全文**，重点 §0 拓扑 · §1.2–1.4 图节点三行式 · §5 决策 D1–D6）
 4. 下游三 task：[`task_web_acquisition_subgraph.md`](./task_web_acquisition_subgraph.md) / [`task_internal_rag_subgraph.md`](./task_internal_rag_subgraph.md) / [`task_web_console_mvp.md`](./task_web_console_mvp.md)（本底座目录槽位须让三者 30 零改动开工）
 5. `docs/standards/CODING_*_L2`（若仓内存在则必读；当前缺失时按仓通用编码约定执行）
 
