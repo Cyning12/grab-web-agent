@@ -40,7 +40,7 @@
 
 | human_gate_id | status | blocks_hats | 说明 |
 |---------------|--------|-------------|------|
-| HG-TASK-DRAFT | pending | 22-R1, 30 | 00 代签授权在案 |
+| HG-TASK-DRAFT | approved | 22-R1, 30 | 00 代签 2026-09-09（授权在案） |
 | HG-AUDIT-R1 | pending | 30 | 00 代签授权在案 |
 
 ---
