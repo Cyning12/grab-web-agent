@@ -40,7 +40,7 @@
 
 | human_gate_id | status | blocks_hats | 说明 |
 |---------------|--------|-------------|------|
-| HG-TASK-DRAFT | pending | 22-R1, 30 | 初稿人扫 |
+| HG-TASK-DRAFT | approved | 22-R1, 30 | 初稿人扫 · 人签 2026-09-09 会话 |
 | HG-AUDIT-R1 | pending | 30 | 22 R1 落盘后人签 |
 
 ---
