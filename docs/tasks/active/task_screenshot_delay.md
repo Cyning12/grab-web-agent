@@ -99,8 +99,8 @@
 
 | 项 | 状态 | 备注 |
 |----|------|------|
-| 延迟插点与默认值的实测依据 | ⏳ | |
-| 真机复跑结果 | ⏳ | |
+| 延迟插点与默认值的实测依据 | ✅ | 插点位于渲染确认探针裁决之后、`_save_screenshot` 之前，仅 `not anti_bot` 路径生效（anti_bot=True 终态页仅截图留痕不空等 · 20 审观察项②）；读取与 FETCH_RENDER_TIMEOUT_MS 同口径（`__init__` 内 os.getenv + 默认值，非法值落默认 + warning）。默认值定 **5000ms**：真机复跑（env 未设走默认）截图全页渲染完整、页面主体稳定可判读；取区间上限因东财对本机持续下发滑块（R5 residual ①：延迟只改善不根除蒙层），async SSE 模式可承受时长增加（residual ②）。 |
+| 真机复跑结果 | ✅ | 2026-09-09 端口 8011（NO_PROXY/no_proxy 大小写双写）；task_id=`36044d85862a4874b36a0e9e2ec11626`；SSE：Pending→Fetching(10%)→warning PAGE_CAPTCHA_OVERLAY→Parsing(50%)→chunk×15→RAGing→conclusion+receipt→100%→**Done**；工单号 `MOCK-805D21EE`；截图 `app/static/shot_8b1b8439f2_1788961145303.png`（2.1MB 全页：K线/股吧/页脚均清晰，顶部仅余小型滑块弹窗，对比基线旧截图 18KB 近空白——蒙层覆盖情况显著改善，供 00 人工看图复核）。 |
 
 ---
 
@@ -112,7 +112,25 @@
 
 ### 自检结论（执行者）
 
-（30/40 回填）
+**验证命令**（worktree `.worktrees/shot`，Python `.venv/bin/python`）：
+
+| 命令 | 退出码 | 关键输出 |
+|------|--------|----------|
+| `npm_config_cache=/tmp/npm-cache-dsh npx --yes dsh-coding-kit@1.10.0 verify --task docs/tasks/active/task_screenshot_delay.md` | 0 | `VERIFY: PASS`（HG-TASK-DRAFT/HG-AUDIT-R1 均 approved） |
+| `.venv/bin/python -m pytest tests -q`（改前基线） | 0 | 120 passed, 2 skipped（122 collected） |
+| `.venv/bin/python -m pytest tests -q`（改后全量） | 0 | **127 passed, 2 skipped**（+7 新延迟单测，基线不回退） |
+| `npx --yes dsh-coding-kit task lint-wiki-delta --target .` | 0 | `LINT-WIKI-DELTA: PASS`（issues: 0） |
+| 真机：`uvicorn app.api.main:app --port 8011`（NO_PROXY 大小写双写）+ POST /api/task + SSE 流 | 0 | Pending→…→Done · 工单 MOCK-805D21EE · 截图 `app/static/shot_8b1b8439f2_1788961145303.png` |
+
+**验收逐条**（勾选框由 00/维护者签，此处仅证据）：
+
+1. 全量测试通过：✅ 127 passed + 2 skipped，基线 122 不回退。
+2. lint-wiki-delta：✅ PASS。
+3. 延迟单测：✅ `TestScreenshotDelay` 7 条——env 取值断言（wait_for_timeout==[settle, env 值] 且先于 screenshot）、非法值（非数字/负数）落默认 + warning、anti_bot 路径（探针不过 + 硬反爬 403）无延迟空等（wait_for_timeout 仅 settle 一次）、D7 降级警告路径同样延迟。
+4. env 断言：✅ `.env.example` 含 `SCREENSHOT_DELAY_MS=5000` + 语义/推荐值注释。
+5. 真机复跑：✅ 全管道 Done，工单号非空，截图落 `app/static/` 供 00 看图（蒙层改善：全页渲染完整，顶部仅余小滑块弹窗）。
+
+**已知未测项**：不同延迟值（3000/4000）的蒙层改善梯度未逐档对比（R5 裁定取区间上限一档实测）；50 独立复检未做（本帽不越界）。
 
 ---
 
