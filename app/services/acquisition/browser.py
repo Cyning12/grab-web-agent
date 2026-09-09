@@ -6,8 +6,11 @@
   （networkidle 优先 / domcontentloaded 兜底）+ 非占位文本等待，确认通过才交
   parse_dom；等待超时抛 FetchTimeout（终态 Error）。阈值经 FETCH_RENDER_TIMEOUT_MS
   可配置（本模块内 os.getenv 读取 · app/config.py 为共享冻结文件）；
-- 滑块/验证码覆盖层检测（东财「拖动下方滑块完成拼图」等特征）：title/URL 无特征
-  时补扫正文与 DOM，命中即 anti_bot_flag=True -> ANTI_BOT 终态，禁止解析半成品；
+- 滑块/验证码覆盖层检测（东财「拖动下方滑块完成拼图」等特征 · 人决 D7 放宽）：
+  检出后先跑渲染确认探针（非占位内容门槛）；探针通过 -> slider_overlay_flag=True
+  降级为警告继续解析（Supervisor 透传 warning 事件 + 结论标注「页面含验证覆盖层」），
+  探针不通过 -> 维持 anti_bot_flag=True -> ANTI_BOT 终态；403/401 与验证页
+  title/URL 硬特征不放宽；任何分支均不主动绕过验证；
 - CDP Turbo：路由拦截丢弃 font/media 等大体积静态资源，仅保留 DOM/脚本/图片，
   换取渲染吞吐（收益未量化，V1 接受基线，见 task residual_risks）；
 - BoundingRect：渲染后 DOM 才有布局信息（架构 §1.3 n2 注），抓取阶段以
@@ -43,7 +46,7 @@ _ANTI_BOT_PATTERN = re.compile(
 )
 
 # 滑块/验证码覆盖层特征：东财「拖动下方滑块完成拼图」等软反爬（title/URL 无特征时
-# 补扫正文 innerText 与 DOM 组件签名；命中即 ANTI_BOT 终态，禁止解析半成品页面）
+# 补扫正文 innerText 与 DOM 组件签名；命中后由渲染确认探针裁决降级警告或 ANTI_BOT）
 _SLIDER_OVERLAY_PATTERN = re.compile(
     r"(拖动下方滑块完成拼图|拖动左边滑块|拖动滑块|滑动滑块|滑块验证|滑块拼图|"
     r"请完成安全验证|nc-container|nc_wrapper|geetest|slide-verify|滑块)",
@@ -95,6 +98,8 @@ class FetchResult:
     screenshot_path: str
     anti_bot_flag: bool
     bbox_map: dict[str, list[int]] = field(default_factory=dict)
+    # 人决 D7：检出滑块覆盖层但渲染确认探针通过（警告但继续解析，非反爬终态）
+    slider_overlay_flag: bool = False
 
 
 class PlaywrightFetcher:
@@ -135,9 +140,24 @@ class PlaywrightFetcher:
                     page.wait_for_timeout(_SETTLE_MS)
                     http_status = response.status if response else 0
                     raw_dom = page.content()
-                    anti_bot = self._detect_anti_bot(page, http_status, raw_dom)
+                    anti_bot = self._detect_hard_anti_bot(page, http_status)
+                    slider_overlay = False
+                    if not anti_bot and self._detect_slider_overlay(page, raw_dom):
+                        # 人决 D7：检出滑块覆盖层先跑渲染确认探针（非占位内容门槛）；
+                        # 探针通过 -> 降级为警告继续解析，探针不通过 -> ANTI_BOT 终态；
+                        # 两种分支均不主动绕过验证
+                        if self._content_probe_passed(page):
+                            slider_overlay = True
+                            logger.warning(
+                                "页面含验证覆盖层（渲染探针通过，降级为警告继续）url=%s", url
+                            )
+                        else:
+                            anti_bot = True
+                            logger.warning(
+                                "滑块覆盖层检出且渲染探针不通过 url=%s -> ANTI_BOT 终态", url
+                            )
                     screenshot_path = self._save_screenshot(page, url)
-                    # 反爬页无采集价值：命中滑块/验证即跳过 bbox 采集，仅截图留痕
+                    # 反爬终态页无采集价值：仅截图留痕，跳过 bbox 采集
                     bbox_map = {} if anti_bot else self._collect_bbox_map(page)
                 finally:
                     browser.close()
@@ -150,10 +170,11 @@ class PlaywrightFetcher:
             logger.warning("fetch 失败 url=%s err=%s", url, exc)
             raise FetchFailed(f"目标页面抓取失败：{url}（{exc}）", url=url) from exc
         logger.info(
-            "fetch 完成 url=%s http_status=%d anti_bot=%s dom_bytes=%d",
+            "fetch 完成 url=%s http_status=%d anti_bot=%s slider_overlay=%s dom_bytes=%d",
             url,
             http_status,
             anti_bot,
+            slider_overlay,
             len(raw_dom),
         )
         return FetchResult(
@@ -162,6 +183,7 @@ class PlaywrightFetcher:
             screenshot_path=screenshot_path,
             anti_bot_flag=anti_bot,
             bbox_map=bbox_map,
+            slider_overlay_flag=slider_overlay,
         )
 
     def _wait_for_render(self, page: Any, url: str) -> None:
@@ -217,13 +239,8 @@ class PlaywrightFetcher:
         page.route("**/*", _route_handler)
 
     @staticmethod
-    def _detect_anti_bot(page: Any, http_status: int, raw_dom: str = "") -> bool:
-        """403/401 状态码、验证页标题/URL 特征或滑块覆盖层特征命中即判反爬（SPEC FP-2）。
-
-        滑块/验证码覆盖层（东财「拖动下方滑块完成拼图」等）常 200 + 正常 title，
-        故补扫正文 innerText 与 raw_dom 组件签名；命中即 ANTI_BOT 终态，
-        禁止继续解析半成品页面（task_fetch_render_wait_lite 范围第 2 行）。
-        """
+    def _detect_hard_anti_bot(page: Any, http_status: int) -> bool:
+        """硬反爬检出（D7 不放宽）：403/401 状态码或验证页标题/URL 特征（SPEC FP-2）。"""
         if http_status in _ANTI_BOT_STATUSES:
             return True
         try:
@@ -231,8 +248,18 @@ class PlaywrightFetcher:
         except Exception:
             title = ""
         final_url = page.url or ""
-        if _ANTI_BOT_PATTERN.search(title) or _ANTI_BOT_PATTERN.search(final_url):
-            return True
+        return bool(
+            _ANTI_BOT_PATTERN.search(title) or _ANTI_BOT_PATTERN.search(final_url)
+        )
+
+    @staticmethod
+    def _detect_slider_overlay(page: Any, raw_dom: str = "") -> bool:
+        """滑块/验证码覆盖层检出（东财「拖动下方滑块完成拼图」等软反爬）。
+
+        覆盖层常 200 + 正常 title，故补扫正文 innerText 与 raw_dom 组件签名；
+        检出后的裁决（警告继续 / ANTI_BOT 终态）由 fetch() 经渲染确认探针完成
+        （人决 D7 · task_fetch_render_wait_lite 失败路径第 3 行）。
+        """
         try:
             body_text = (
                 page.evaluate("() => (document.body ? document.body.innerText : '')")
@@ -268,6 +295,18 @@ class PlaywrightFetcher:
             if _SLIDER_OVERLAY_PATTERN.search(frame_text):
                 return True
         return False
+
+    @staticmethod
+    def _content_probe_passed(page: Any) -> bool:
+        """渲染确认探针（人决 D7 放行前提）：主框架非占位文本达阈值即视内容真实渲染。
+
+        复用 _CONTENT_READY_JS 口径（与 _wait_for_render 同一门槛）；探针异常
+        （页面崩溃/上下文销毁等）一律视为不通过 -> ANTI_BOT 终态，不放大放行面。
+        """
+        try:
+            return bool(page.evaluate(_CONTENT_READY_JS))
+        except Exception:
+            return False
 
     def _save_screenshot(self, page: Any, url: str) -> str:
         """整页截图落盘 static_dir，返回 /static 相对路径（SPEC A6 可追溯）。"""

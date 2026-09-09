@@ -138,3 +138,13 @@ def test_template_contains_a5_banner_wired_to_receipt():
     assert "receipt.ticket_id" in html           # 工单号逐字取自回填回执
     assert "模拟写入失败：" in html                # SPEC FP-4 回填失败文案
     assert 'id="receipt-bar"' in html
+
+
+# --- D7 warning 横幅（滑块覆盖层降级「页面提示」最小落点 · 非范围例外放行一处） ---------
+
+
+def test_template_contains_warning_banner_branch():
+    html = TEMPLATE.read_text(encoding="utf-8")
+    assert 'id="warn-banner"' in html                    # 黄色横幅容器
+    assert 'addEventListener("warning"' in html          # 第六类 SSE 事件渲染分支
+    assert "目标页含验证覆盖层，结果已人工可复核" in html    # 人决 D7 页面提示文案

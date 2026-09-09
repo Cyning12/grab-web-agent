@@ -12,6 +12,7 @@
     #progress-track { flex: 1; height: 10px; background: #eee; border-radius: 5px; overflow: hidden; }
     #progress-fill { height: 100%; width: 0; background: #3b82f6; transition: width .3s; }
     #conn-banner { display: none; background: #fef3c7; border: 1px solid #f59e0b; border-radius: 6px; padding: .5rem .8rem; margin: .5rem 0; }
+    #warn-banner { display: none; background: #fef3c7; border: 1px solid #f59e0b; border-radius: 6px; padding: .5rem .8rem; margin: .5rem 0; color: #92400e; }
     .error-box { display: none; background: #fee2e2; border: 1px solid #ef4444; border-radius: 6px; padding: .5rem .8rem; margin: .5rem 0; color: #991b1b; }
     #shot-img { max-width: 320px; border: 1px solid #ccc; border-radius: 4px; display: block; margin-top: .5rem; }
     .chunk-card { border-top: 1px dashed #ccc; padding: .5rem 0; }
@@ -40,6 +41,7 @@
     <span id="progress-text">0%</span>
   </div>
   <div id="conn-banner"></div>
+  <div id="warn-banner"></div>
 
   <main>
     <section id="step1-preview">
@@ -91,6 +93,8 @@
   var BACKOFF_MS = [1000, 2000, 4000, 8000, 16000];
 
   function showConn(text) { var b = el("conn-banner"); b.textContent = text; b.style.display = text ? "block" : "none"; }
+  // D7 warning 渲染分支：滑块覆盖层降级警告的黄色横幅（人决「页面提示」最小落点）
+  function showWarn(text) { var b = el("warn-banner"); b.textContent = text; b.style.display = text ? "block" : "none"; }
   function showError(boxId, text) { var b = el(boxId); if (b) { b.textContent = text; b.style.display = text ? "block" : "none"; } }
   function setProgress(p) { el("progress-fill").style.width = p + "%"; el("progress-text").textContent = p + "%"; }
   function setStatus(status, detail) {
@@ -204,6 +208,11 @@
         if (d.detail === "重新生成") b.innerHTML = "<p>生成中…</p>";
       }
       if (d.status === "Done" || d.status === "Error") lockTerminal();  // 终态收敛（SPEC A9）
+    });
+    es.addEventListener("warning", function (e) {
+      touch();
+      var d = JSON.parse(e.data);
+      showWarn((d && d.message) || "目标页含验证覆盖层，结果已人工可复核");
     });
     es.addEventListener("chunk", function (e) { touch(); renderChunk(JSON.parse(e.data)); });
     es.addEventListener("conclusion", function (e) { touch(); renderConclusion(JSON.parse(e.data)); });

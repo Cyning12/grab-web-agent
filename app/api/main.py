@@ -4,7 +4,8 @@
 - POST /api/task                    入参 URL -> SSRF 白名单校验 -> 注册表登记 -> 后台异步触发
                                     Supervisor -> 立即返回 {task_id}（不经 HTTP 长等待 · SPEC A1）
 - GET  /api/task/{id}/stream        SSE 流：订阅即回放事件历史（断线补拉），再实时转发
-                                    progress/state/chunk/conclusion/error 五类事件
+                                    progress/state/chunk/conclusion/warning/error 六类事件
+                                    （warning 为人决 D7 滑块覆盖层降级警告 · 架构 §1.1 D7 行）
 - GET  /api/task/{id}               任务快照补拉（注册表内存态直出）
 - POST /api/task/{id}/regenerate    以同一 Payload 重跑对内子图（SPEC A8 · 管理员「重新生成」）
 - GET  /static/<path>               截图落盘目录静态托管（Step 1 缩略图 · SPEC A6）
@@ -161,7 +162,11 @@ async def _event_stream(registry: TaskRegistry, task_id: str) -> AsyncIterator[s
 
 @app.get("/api/task/{task_id}/stream")
 async def stream_task(task_id: str, request: Request) -> StreamingResponse:
-    """SSE 端点（五类事件枚举：progress/state/chunk/conclusion/error · 架构 §1.1）。"""
+    """SSE 端点（六类事件枚举：progress/state/chunk/conclusion/warning/error · 架构 §1.1）。
+
+    转发与回放对事件类型透明（envelope 原样透传），warning 事件无需特判；
+    终态判定仍仅 state 落 Done/Error（warning 非终态，不关流）。
+    """
     registry: TaskRegistry = request.app.state.registry
     return StreamingResponse(
         _event_stream(registry, task_id),

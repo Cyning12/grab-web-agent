@@ -35,6 +35,8 @@ class TaskRecord:
     status_detail: str | None = None
     progress: int = 0
     payload: dict[str, Any] | None = None
+    # D7：滑块覆盖层降级警告（PAGE_CAPTCHA_OVERLAY）；非 None 时结论 JSON 带标注
+    warning: dict[str, Any] | None = None
     conclusion: dict[str, Any] | None = None
     receipt: dict[str, Any] | None = None
     error: dict[str, Any] | None = None
@@ -119,6 +121,7 @@ class TaskRegistry:
             "status_detail": record.status_detail,
             "progress": record.progress,
             "payload": record.payload,
+            "warning": record.warning,
             "conclusion": record.conclusion,
             "receipt": record.receipt,
             "error": record.error,
