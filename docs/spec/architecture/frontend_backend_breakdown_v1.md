@@ -76,6 +76,7 @@
 | `state` | `{status: Pending\|Fetching\|Parsing\|RAGing\|Done, detail?: string}` | 每次状态机迁移；终态含 `Done(回填失败)` 语义于 detail | 【PRD §6.3 · SPEC 范围 4】 |
 | `chunk` | `{index, title, text, section_path, xpath, token_count}` | Parsing 期间每产出一个已嵌入 chunk 即推一条（Step 2「实时展示」） | 【SPEC A3 · PRD §3.2 Step 2】 |
 | `conclusion` | `{conclusion: <结论JSON>, receipt: <回填回执>}` | 对内子图 Writeback 节点完成后推送一次（A5 闭环数据源） | 【SPEC A4/A5 · PRD §3.2 Step 3】 |
+| `warning`（D7 增 · 第六类） | `{code, message}` | 非致命异常（如页面含验证覆盖层但探针通过、降级截断 Top-K）；不中断流，前端横幅提示 | 【人决 D7 · task_fetch_render_wait_lite】 |
 | `error` | `{code, message, retryable: bool}` | 任一 failure_paths 行触发、任务转终态 Error 时推送 | 【SPEC A9 · 六条 failure_paths】 |
 
 **任务注册表内存态结构**【SPEC FP-5「内存态可接受，须日志可查」· SPEC residual_risks ①】：
@@ -317,6 +318,7 @@ Flask 仅交付首屏 HTML 骨架（输入框 + 「开始调研」按钮 + 三�
 | D4 | MVP 验证场景 | **实时股票页抓取（对外）+ 财报内部文档（对内）** | 对外目标页 ×2：`https://quote.eastmoney.com/sz000858.html`（五粮液）、`https://quote.eastmoney.com/sz300810.html`（中科海讯）；对内语料来源：巨潮全文检索（五粮液 / 中科海讯），样例已人工保存。SPEC 通用「竞品/行业调研」表述的场景实例化，非范围变更。**D4 修订注（2026-09-09 · task_fetch_render_wait_lite）**：真机验收发现标准页触发滑块验证且字段 JS 异步未渲染即解析，对外目标页默认切换为 concept 极速版 `https://quote.eastmoney.com/concept/sz000858.html` / `https://quote.eastmoney.com/concept/sz300810.html`（`.env.example` TASK_TARGET_URLS 同步）；fetch 节点增加渲染完成确认 + 滑块覆盖层检出（ANTI_BOT 终态） |
 | D5 | SiliconFlow 模型选型 | 生成：`deepseek-ai/DeepSeek-V4-Flash`；Embedding：`bge-m3`（BAAI/bge-m3） | 人决（P2 闭环）；全部经 `.env` 可配置，不落盘明文 Key；30 施工以 env 变量名为唯一引用 |
 | D6 | 内部语料目录约定 | `company/` 按**上市编号**命名区分（如 `company/sz000858/`、`company/sz300810/`） | 样例已人工保存；**后续**补抓取脚本（cninfo 全文检索 → 按编号落盘），单独立 task，不占本批 30 范围 |
+| D7 | 滑块检出语义 | **放宽为「警告但继续」**：渲染确认探针通过（内容非占位）则继续解析，结论标注「页面含验证覆盖层」，SSE 增 `warning` 事件；探针不通过才 ANTI_BOT 终态 | 真机实证：滑块为悬浮覆盖层、背景 DOM 已完整渲染（截图 ×2 00 亲验）；严格拦截在本机 IP 持续被反爬时不可达 Done。不主动绕过验证（V2 反爬仍排除） |
 
 ---
 
