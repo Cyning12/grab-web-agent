@@ -6,6 +6,10 @@
   （networkidle 优先 / domcontentloaded 兜底）+ 非占位文本等待，确认通过才交
   parse_dom；等待超时抛 FetchTimeout（终态 Error）。阈值经 FETCH_RENDER_TIMEOUT_MS
   可配置（本模块内 os.getenv 读取 · app/config.py 为共享冻结文件）；
+- 截图触发延迟（task_screenshot_delay）：渲染确认探针裁决后、截图留痕前按
+  SCREENSHOT_DELAY_MS 等待页面/蒙层稳定（本模块内 os.getenv 读取，非法值落
+  默认 + warning）；仅探针通过的正常路径（含 D7 降级警告路径）延迟，
+  anti_bot 终态页仅截图留痕不空等；
 - 滑块/验证码覆盖层检测（东财「拖动下方滑块完成拼图」等特征 · 人决 D7 放宽）：
   检出后先跑渲染确认探针（非占位内容门槛）；探针通过 -> slider_overlay_flag=True
   降级为警告继续解析（Supervisor 透传 warning 事件 + 结论标注「页面含验证覆盖层」），
@@ -35,6 +39,7 @@ logger = logging.getLogger(__name__)
 _DEFAULT_STATIC_DIR = Path(__file__).resolve().parents[2] / "static"
 _DEFAULT_TIMEOUT_MS = 30000
 _DEFAULT_RENDER_TIMEOUT_MS = 10000
+_DEFAULT_SCREENSHOT_DELAY_MS = 5000  # 实测依据见 task_screenshot_delay 实现备忘
 _SETTLE_MS = 1200
 _CONTENT_READY_MIN_CHARS = 30
 
@@ -110,6 +115,7 @@ class PlaywrightFetcher:
         timeout_ms: int | None = None,
         render_timeout_ms: int | None = None,
         static_dir: str | Path | None = None,
+        screenshot_delay_ms: int | None = None,
     ) -> None:
         self.timeout_ms = timeout_ms or int(
             os.getenv("ACQ_FETCH_TIMEOUT_MS", str(_DEFAULT_TIMEOUT_MS))
@@ -118,7 +124,38 @@ class PlaywrightFetcher:
         self.render_timeout_ms = render_timeout_ms or int(
             os.getenv("FETCH_RENDER_TIMEOUT_MS", str(_DEFAULT_RENDER_TIMEOUT_MS))
         )
+        # 截图触发延迟（env 可配；非法值落默认 + warning，不中断）
+        self.screenshot_delay_ms = (
+            screenshot_delay_ms
+            if screenshot_delay_ms is not None
+            else self._read_screenshot_delay_ms()
+        )
         self.static_dir = Path(static_dir or os.getenv("ACQ_STATIC_DIR") or _DEFAULT_STATIC_DIR)
+
+    @staticmethod
+    def _read_screenshot_delay_ms() -> int:
+        """读取 SCREENSHOT_DELAY_MS（与 FETCH_RENDER_TIMEOUT_MS 同口径：模块内
+        os.getenv + 默认值）；非数字/负数落默认并记 warning（失败路径第 2 行）。"""
+        raw = os.getenv("SCREENSHOT_DELAY_MS")
+        if raw is None or not raw.strip():
+            return _DEFAULT_SCREENSHOT_DELAY_MS
+        try:
+            value = int(raw)
+        except ValueError:
+            logger.warning(
+                "SCREENSHOT_DELAY_MS 非法值 %r（非数字），落默认 %d ms",
+                raw,
+                _DEFAULT_SCREENSHOT_DELAY_MS,
+            )
+            return _DEFAULT_SCREENSHOT_DELAY_MS
+        if value < 0:
+            logger.warning(
+                "SCREENSHOT_DELAY_MS 非法值 %d（负数），落默认 %d ms",
+                value,
+                _DEFAULT_SCREENSHOT_DELAY_MS,
+            )
+            return _DEFAULT_SCREENSHOT_DELAY_MS
+        return value
 
     def fetch(self, url: str) -> FetchResult:
         """渲染抓取单 URL；超时抛 FetchTimeout，其余抓取异常归一为 FetchFailed。"""
@@ -156,6 +193,11 @@ class PlaywrightFetcher:
                             logger.warning(
                                 "滑块覆盖层检出且渲染探针不通过 url=%s -> ANTI_BOT 终态", url
                             )
+                    # 截图触发延迟（task_screenshot_delay · 20 审观察项② 条件化插点）：
+                    # 仅渲染探针通过的正常路径（含 D7 降级警告路径）截图前等待页面/
+                    # 蒙层稳定；anti_bot=True（硬反爬/探针不过）仅留痕不空等
+                    if not anti_bot:
+                        page.wait_for_timeout(self.screenshot_delay_ms)
                     screenshot_path = self._save_screenshot(page, url)
                     # 反爬终态页无采集价值：仅截图留痕，跳过 bbox 采集
                     bbox_map = {} if anti_bot else self._collect_bbox_map(page)

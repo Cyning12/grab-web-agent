@@ -19,6 +19,8 @@ from app.graphs.acquisition import build_acquisition_graph, clear_status_hooks
 from app.services.acquisition import FetchResult, FetchTimeout
 from app.services.acquisition.browser import (
     _CONTENT_READY_MIN_CHARS,
+    _DEFAULT_SCREENSHOT_DELAY_MS,
+    _SETTLE_MS,
     PlaywrightFetcher,
 )
 from test_acquisition_parser import build_fixture_html
@@ -346,3 +348,91 @@ class TestSliderDetection:
         assert result.anti_bot_flag is False
         assert result.slider_overlay_flag is False
         assert "五粮液" in result.raw_dom
+
+
+class TestScreenshotDelay:
+    """截图触发延迟（task_screenshot_delay）：探针通过路径截图前按 env 延迟；
+    非法值落默认 + warning；anti_bot 路径（硬反爬/探针不过）无延迟空等。"""
+
+    def test_delay_called_with_env_value_before_screenshot(
+        self, tmp_path, monkeypatch
+    ):
+        """正常路径：wait_for_timeout 被调用且时长取自 SCREENSHOT_DELAY_MS，且在截图前。"""
+        monkeypatch.setenv("SCREENSHOT_DELAY_MS", "2500")
+        page = FakePage(build_fixture_html(), body_text=_NORMAL_BODY_TEXT)
+        _patch_playwright(monkeypatch, page)
+        result = PlaywrightFetcher(static_dir=tmp_path).fetch(page.url)
+
+        waits = [c[1] for c in page.calls if c[0] == "wait_for_timeout"]
+        assert waits == [_SETTLE_MS, 2500]  # settle + 截图触发延迟（取自 env）
+        # 延迟须发生在截图触发之前
+        kinds = page.calls
+        assert kinds.index(("wait_for_timeout", 2500)) < kinds.index(("screenshot",))
+        assert result.screenshot_path.startswith("/static/")
+
+    def test_slider_overlay_probe_pass_path_also_delayed(self, tmp_path, monkeypatch):
+        """D7 降级警告路径（探针通过）同样截图前延迟（蒙层稳定正是本 task 目标场景）。"""
+        monkeypatch.setenv("SCREENSHOT_DELAY_MS", "1800")
+        page = FakePage(
+            SLIDER_FIXTURE_HTML,
+            body_text=_NORMAL_BODY_TEXT + " " + _SLIDER_BODY_TEXT,
+        )
+        _patch_playwright(monkeypatch, page)
+        result = PlaywrightFetcher(static_dir=tmp_path).fetch(page.url)
+
+        waits = [c[1] for c in page.calls if c[0] == "wait_for_timeout"]
+        assert waits == [_SETTLE_MS, 1800]
+        assert result.slider_overlay_flag is True
+        assert result.anti_bot_flag is False
+
+    def test_invalid_env_value_falls_back_to_default_with_warning(
+        self, monkeypatch, caplog
+    ):
+        """非数字 -> 落默认 + warning，不中断（失败路径第 2 行）。"""
+        monkeypatch.setenv("SCREENSHOT_DELAY_MS", "abc")
+        with caplog.at_level("WARNING"):
+            fetcher = PlaywrightFetcher()
+        assert fetcher.screenshot_delay_ms == _DEFAULT_SCREENSHOT_DELAY_MS
+        assert any("SCREENSHOT_DELAY_MS" in r.message for r in caplog.records)
+
+    def test_negative_env_value_falls_back_to_default_with_warning(
+        self, monkeypatch, caplog
+    ):
+        """负数 -> 落默认 + warning。"""
+        monkeypatch.setenv("SCREENSHOT_DELAY_MS", "-100")
+        with caplog.at_level("WARNING"):
+            fetcher = PlaywrightFetcher()
+        assert fetcher.screenshot_delay_ms == _DEFAULT_SCREENSHOT_DELAY_MS
+        assert any("SCREENSHOT_DELAY_MS" in r.message for r in caplog.records)
+
+    def test_unset_env_uses_default(self, monkeypatch):
+        """未设置 env -> 默认值（建议区间 3000-5000ms）。"""
+        monkeypatch.delenv("SCREENSHOT_DELAY_MS", raising=False)
+        fetcher = PlaywrightFetcher()
+        assert fetcher.screenshot_delay_ms == _DEFAULT_SCREENSHOT_DELAY_MS
+        assert 3000 <= _DEFAULT_SCREENSHOT_DELAY_MS <= 5000
+
+    def test_anti_bot_path_no_delay_wait(self, tmp_path, monkeypatch):
+        """anti_bot 路径（探针不过）截图留痕不空等：无截图延迟 wait_for_timeout。"""
+        monkeypatch.setenv("SCREENSHOT_DELAY_MS", "2500")
+        page = FakePage(SLIDER_FIXTURE_HTML, body_text=_SLIDER_BODY_TEXT)
+        _patch_playwright(monkeypatch, page)
+        result = PlaywrightFetcher(static_dir=tmp_path).fetch(page.url)
+
+        waits = [c[1] for c in page.calls if c[0] == "wait_for_timeout"]
+        assert waits == [_SETTLE_MS]  # 仅 settle，无截图触发延迟空等
+        assert result.anti_bot_flag is True
+        assert result.screenshot_path.startswith("/static/")  # 留痕仍落盘
+
+    def test_hard_anti_bot_path_no_delay_wait(self, tmp_path, monkeypatch):
+        """硬反爬（403）路径同样不延迟空等。"""
+        monkeypatch.setenv("SCREENSHOT_DELAY_MS", "2500")
+        page = FakePage(
+            build_fixture_html(), body_text=_NORMAL_BODY_TEXT, http_status=403
+        )
+        _patch_playwright(monkeypatch, page)
+        result = PlaywrightFetcher(static_dir=tmp_path).fetch(page.url)
+
+        waits = [c[1] for c in page.calls if c[0] == "wait_for_timeout"]
+        assert waits == [_SETTLE_MS]
+        assert result.anti_bot_flag is True
