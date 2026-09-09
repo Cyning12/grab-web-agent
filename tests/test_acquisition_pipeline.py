@@ -204,7 +204,7 @@ class TestFailureInjection:
     reason="live 冒烟默认关闭（真实浏览器 + 真实 SiliconFlow Embedding + 外网）",
 )
 class TestLiveSmoke:
-    """可选 live 冒烟：ACQ_LIVE_SMOKE=1 时跑真实东财页（人决 D4 目标页）。"""
+    """可选 live 冒烟：ACQ_LIVE_SMOKE=1 时跑真实东财页（concept 极速版 · task_fetch_render_wait_lite）。"""
 
     def test_live_eastmoney(self, tmp_path):
         from app.services.acquisition import ChunkEmbedder, PlaywrightFetcher
@@ -212,7 +212,7 @@ class TestLiveSmoke:
         graph = build_acquisition_graph(
             fetcher=PlaywrightFetcher(static_dir=tmp_path), embedder=ChunkEmbedder()
         )
-        result = graph.invoke({"url": "https://quote.eastmoney.com/sz000858.html"})
+        result = graph.invoke({"url": "https://quote.eastmoney.com/concept/sz000858.html"})
         if "error" in result:  # 反爬/超时属已定义失败路径，live 环境不保证成功率
             assert result["error"]["code"] in {
                 "FETCH_TIMEOUT",

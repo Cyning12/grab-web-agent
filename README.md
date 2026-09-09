@@ -59,13 +59,18 @@ curl -i http://127.0.0.1:5000/             # → 200 首屏 HTML
 
 打开 `http://127.0.0.1:5000/`（管理员视角 `?role=admin`），输入目标 URL 点「开始调研」即可看到三区块渐进回填与底部工单回执。
 
+演示目标 URL（东财概念极速版 · 人决 D4 修订 · 默认 `TASK_TARGET_URLS` 同款）：
+
+- `https://quote.eastmoney.com/concept/sz000858.html`（五粮液）
+- `https://quote.eastmoney.com/concept/sz300810.html`（中科海讯）
+
 ### 已知事项（真机 E2E 实测踩坑 · 2026-09-09）
 
 1. **NO_PROXY 含 `[::1]` 会导致 LLM/Embedding 调用炸 `InvalidURL`**（httpx2 解析 bracketed IPv6 缺陷）。启动服务前净化：
    ```bash
    export NO_PROXY=localhost,127.0.0.1,::1   # 去掉 [::1] 项
    ```
-2. 东财个股页价格为 JS 异步渲染，首屏快照多为「-」占位，此时结论会如实输出 `insufficient_info=true`（铁律一：不降级多模态硬猜）。需要价格字段时给 fetch 节点加等待锚点（V1.x 候选）。
+2. 东财**标准**个股页价格为 JS 异步渲染且可能触发「拖动下方滑块完成拼图」滑块验证（软反爬）。默认目标已切 concept 极速版链接（干扰少）；fetch 节点已加渲染完成确认（networkidle 优先 / domcontentloaded 兜底 + 非占位文本等待，`FETCH_RENDER_TIMEOUT_MS` 可调），检出滑块覆盖层即 ANTI_BOT 终态不解析半成品；仍渲染不出有效内容时结论如实输出 `insufficient_info=true`（铁律一：不降级多模态硬猜）。
 3. live 冒烟默认关：置 `ACQ_LIVE_SMOKE=1` / `RAG_LIVE_SMOKE=1` 才会真实调用外网/SiliconFlow（会烧 Key 额度）。
 
 ## 工程结构（task_project_scaffold 底座）

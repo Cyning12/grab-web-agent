@@ -66,7 +66,7 @@ def test_post_task_async_returns_task_id(client):
     """A1：合法 URL 立即返回 task_id，不经 HTTP 长等待（后台异步执行）。"""
     fastapi_app.state.acq_runner = _fake_acq_ok
     fastapi_app.state.rag_runner = _fake_rag_ok
-    resp = client.post("/api/task", json={"url": "https://quote.eastmoney.com/sz000858.html"})
+    resp = client.post("/api/task", json={"url": "https://quote.eastmoney.com/concept/sz000858.html"})
     assert resp.status_code == 201
     task_id = resp.json()["task_id"]
     assert task_id
@@ -83,7 +83,7 @@ def test_regenerate_guards(client):
     """未知任务 404；尚无 Payload 的任务 409（架构 §1.1 regenerate 端点契约）。"""
     assert client.post("/api/task/nope/regenerate").status_code == 404
     fastapi_app.state.acq_runner = lambda url: {"error": {"code": "FETCH_TIMEOUT", "message": "t", "retryable": True}}
-    resp = client.post("/api/task", json={"url": "https://quote.eastmoney.com/sz000858.html"})
+    resp = client.post("/api/task", json={"url": "https://quote.eastmoney.com/concept/sz000858.html"})
     task_id = resp.json()["task_id"]
     import time
     for _ in range(100):  # 等后台任务落定（失败终态，无 Payload）

@@ -22,7 +22,8 @@ from app.services.rag.generator import ConclusionGenerator
 from app.services.rag.writeback import InMemoryOAEndpoint, MockWritebackClient
 from tests.internal_rag_fakes import FakeLLMClient, FakeRetriever, make_payload
 
-TARGET_URL = "https://quote.eastmoney.com/sz000858.html"
+# 与 .env.example 默认 TASK_TARGET_URLS 对齐（concept 极速版 · task_fetch_render_wait_lite）
+TARGET_URL = "https://quote.eastmoney.com/concept/sz000858.html"
 
 
 def make_rag_runner(*, oa_fail_status: int | None = None, llm_fail: bool = False):

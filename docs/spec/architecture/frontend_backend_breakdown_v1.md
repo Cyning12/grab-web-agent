@@ -314,7 +314,7 @@ Flask 仅交付首屏 HTML 骨架（输入框 + 「开始调研」按钮 + 三�
 | D1 | 前后端是否分库 | **否 · 单仓 monorepo**：`git@github.com:Cyning12/grab-web-agent.git` | PRD §2.2 双轨是**子图/模块级**解耦而非仓库级；前端仅 Flask 模板 + vanilla JS（§2.1），无独立构建链；本地运行（D3）无分库收益。V2 前端独立 SPA 时再议 |
 | D2 | LLM / Embedding API 服务商 | **SiliconFlow** | 对内结论生成（with_structured_output）+ 对外/对内 Embedding 统一走 SiliconFlow API；`SILICONFLOW_API_KEY` 经环境变量注入、不落盘明文【T-RAG 非范围】；具体模型选型（生成 / Embedding 各一）为 30 开工第一个人工确认项（原 SPEC residual_risks ④ 的落点） |
 | D3 | 发布/部署 | **V1 仅本地运行**，不考虑发布 | §1.6 部署节降级为本地拓扑说明；A7 docker 限额验收保留（本地 docker 可执行）；远程仓仅作代码备份/协作，不配 CI 部署。远程已首推（2026-09-09 人执） |
-| D4 | MVP 验证场景 | **实时股票页抓取（对外）+ 财报内部文档（对内）** | 对外目标页 ×2：`https://quote.eastmoney.com/sz000858.html`（五粮液）、`https://quote.eastmoney.com/sz300810.html`（中科海讯）；对内语料来源：巨潮全文检索（五粮液 / 中科海讯），样例已人工保存。SPEC 通用「竞品/行业调研」表述的场景实例化，非范围变更 |
+| D4 | MVP 验证场景 | **实时股票页抓取（对外）+ 财报内部文档（对内）** | 对外目标页 ×2：`https://quote.eastmoney.com/sz000858.html`（五粮液）、`https://quote.eastmoney.com/sz300810.html`（中科海讯）；对内语料来源：巨潮全文检索（五粮液 / 中科海讯），样例已人工保存。SPEC 通用「竞品/行业调研」表述的场景实例化，非范围变更。**D4 修订注（2026-09-09 · task_fetch_render_wait_lite）**：真机验收发现标准页触发滑块验证且字段 JS 异步未渲染即解析，对外目标页默认切换为 concept 极速版 `https://quote.eastmoney.com/concept/sz000858.html` / `https://quote.eastmoney.com/concept/sz300810.html`（`.env.example` TASK_TARGET_URLS 同步）；fetch 节点增加渲染完成确认 + 滑块覆盖层检出（ANTI_BOT 终态） |
 | D5 | SiliconFlow 模型选型 | 生成：`deepseek-ai/DeepSeek-V4-Flash`；Embedding：`bge-m3`（BAAI/bge-m3） | 人决（P2 闭环）；全部经 `.env` 可配置，不落盘明文 Key；30 施工以 env 变量名为唯一引用 |
 | D6 | 内部语料目录约定 | `company/` 按**上市编号**命名区分（如 `company/sz000858/`、`company/sz300810/`） | 样例已人工保存；**后续**补抓取脚本（cninfo 全文检索 → 按编号落盘），单独立 task，不占本批 30 范围 |
 
@@ -328,3 +328,4 @@ Flask 仅交付首屏 HTML 骨架（输入框 + 「开始调研」按钮 + 三�
 | 2026-09-09 | 10-spec 帽全量回填：§0 拓扑一图流 · §1 后端（API/SSE 枚举/注册表 + Supervisor + 双子图节点三行式）· §1.5 契约（Payload 字段表/结论 Schema/状态机触发表）· §1.6 资源部署 · §2 前端三区块与 SSE 重连 · §3 端到端时序（含 A5 闭环与失败分支）· §4 铁律映射；一致性自检无冲突；状态 draft-shell → draft |
 | 2026-09-09 | 00 落盘人决 D1–D3（§5 决策记录）：单仓 monorepo · SiliconFlow · V1 仅本地运行；§1.6 同步修订 |
 | 2026-09-09 | 00 落盘人决 D4–D6：MVP 场景=东财股票页 ×2 + 巨潮财报语料 · 模型=DeepSeek-V4-Flash + bge-m3 · company/ 语料目录约定 |
+| 2026-09-09 | 30 补 D4 修订注（task_fetch_render_wait_lite）：对外目标页默认切 concept 极速版 + fetch 渲染完成确认/滑块检出 |
