@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>智能网页调研 Agent</title>
+  <style>
+    body { font-family: -apple-system, "PingFang SC", sans-serif; margin: 2rem auto; max-width: 960px; padding: 0 1rem; color: #222; }
+    h1 { font-size: 1.4rem; }
+    section { border: 1px solid #ddd; border-radius: 8px; padding: 1rem; margin: 1rem 0; }
+    #status-bar { display: flex; gap: 1rem; align-items: center; margin: 0.8rem 0; }
+    #progress-track { flex: 1; height: 10px; background: #eee; border-radius: 5px; overflow: hidden; }
+    #progress-fill { height: 100%; width: 0; background: #3b82f6; transition: width .3s; }
+    #conn-banner { display: none; background: #fef3c7; border: 1px solid #f59e0b; border-radius: 6px; padding: .5rem .8rem; margin: .5rem 0; }
+    #warn-banner { display: none; background: #fef3c7; border: 1px solid #f59e0b; border-radius: 6px; padding: .5rem .8rem; margin: .5rem 0; color: #92400e; }
+    .error-box { display: none; background: #fee2e2; border: 1px solid #ef4444; border-radius: 6px; padding: .5rem .8rem; margin: .5rem 0; color: #991b1b; }
+    #shot-img { max-width: 320px; border: 1px solid #ccc; border-radius: 4px; display: block; margin-top: .5rem; }
+    .chunk-card { border-top: 1px dashed #ccc; padding: .5rem 0; }
+    .chunk-card .loc { color: #666; font-size: .8rem; }
+    .kv { margin: .2rem 0; }
+    .kv b { display: inline-block; min-width: 5.5em; }
+    #receipt-bar { padding: .8rem; border-radius: 6px; margin-top: 1rem; display: none; }
+    #receipt-bar.ok { display: block; background: #dcfce7; border: 1px solid #16a34a; color: #14532d; }
+    #receipt-bar.fail { display: block; background: #fee2e2; border: 1px solid #ef4444; color: #991b1b; }
+    button:disabled { opacity: .5; }
+  </style>
+</head>
+<body>
+  <h1>智能网页调研 Agent</h1>
+  <!-- 首屏骨架（架构 §2.1）：输入框 + 开始调研按钮 + 三区块容器 + 底部回执条。
+       动态数据全部由本脚本经 fetch / EventSource 直连 FastAPI（{{ api_base }}）。 -->
+  <form id="task-form">
+    <input id="task-url" type="url" placeholder="请输入目标 URL" size="48" required>
+    <button id="task-submit" type="submit">开始调研</button>
+    <span id="url-error" class="error-box"></span>
+  </form>
+
+  <div id="status-bar">
+    <span>状态：<b id="status-badge">空闲</b></span>
+    <div id="progress-track"><div id="progress-fill"></div></div>
+    <span id="progress-text">0%</span>
+  </div>
+  <div id="conn-banner"></div>
+  <div id="warn-banner"></div>
+
+  <main>
+    <section id="step1-preview">
+      <h2>Step 1 · 页面预览</h2>
+      <div id="step1-body"><p class="placeholder">提交任务并抓取完成后展示截图与元信息。</p></div>
+      <div id="step1-error" class="error-box"></div>
+    </section>
+    <section id="step2-chunks">
+      <h2>Step 2 · 知识切片</h2>
+      <div id="step2-body"><p class="placeholder">解析期间实时展示 pre_chunks。</p></div>
+      <div id="step2-error" class="error-box"></div>
+    </section>
+    {% if is_admin %}
+    <section id="step3-conclusion">
+      <h2>Step 3 · 结论回填</h2>
+      <button id="regen-btn" type="button" disabled>重新生成</button>
+      <div id="step3-body"><p class="placeholder">对内子图完成后展示结构化结论卡片与回填回执。</p></div>
+      <div id="step3-error" class="error-box"></div>
+    </section>
+    {% endif %}
+  </main>
+  <footer id="receipt-bar"></footer>
+
+<script>
+(function () {
+  "use strict";
+  var API = {{ api_base | tojson }};
+  var IS_ADMIN = {{ "true" if is_admin else "false" }};
+
+  // 错误码 -> 页面文案（与 SPEC/T-WEB/T-ACQ/T-RAG failure_paths 逐行对齐 · SPEC A9）
+  var ERROR_TEXT = {
+    URL_REJECTED: "目标 URL 不被允许",
+    FETCH_TIMEOUT: "目标页面抓取超时，请稍后重试",
+    FETCH_FAILED: "目标页面抓取失败，请稍后重试",
+    ANTI_BOT: "目标站点拒绝访问（反爬拦截）",
+    EMBED_FAILED: "向量化失败，请稍后重试",
+    CONTRACT_VIOLATION: "数据契约异常",
+    GENERATE_FAILED: "结论生成失败",
+    TASK_NOT_FOUND: "任务不存在或已过期（服务重启后任务状态丢失），请重新提交",
+    SUPERVISOR_FAILED: "任务编排异常，请重新提交"
+  };
+
+  var el = function (id) { return document.getElementById(id); };
+  var state = {
+    taskId: null, es: null, terminal: false,
+    attempts: 0, maxAttempts: 5, timer: null, lastEventAt: 0,
+    chunkCount: 0, seenChunks: {}, staleTimer: null
+  };
+  var BACKOFF_MS = [1000, 2000, 4000, 8000, 16000];
+
+  function showConn(text) { var b = el("conn-banner"); b.textContent = text; b.style.display = text ? "block" : "none"; }
+  // D7 warning 渲染分支：滑块覆盖层降级警告的黄色横幅（人决「页面提示」最小落点）
+  function showWarn(text) { var b = el("warn-banner"); b.textContent = text; b.style.display = text ? "block" : "none"; }
+  function showError(boxId, text) { var b = el(boxId); if (b) { b.textContent = text; b.style.display = text ? "block" : "none"; } }
+  function setProgress(p) { el("progress-fill").style.width = p + "%"; el("progress-text").textContent = p + "%"; }
+  function setStatus(status, detail) {
+    el("status-badge").textContent = status + (detail ? "（" + detail + "）" : "");
+  }
+  function touch() {
+    state.lastEventAt = Date.now();
+    showConn("");
+    clearTimeout(state.staleTimer);
+    // 进度停滞阈值（SPEC FP-5：15s 无事件提示「连接中断，正在重连」）
+    state.staleTimer = setTimeout(function () {
+      if (!state.terminal && state.taskId) showConn("连接中断，正在重连");
+    }, 15000);
+  }
+
+  function renderStep1(payload) {
+    if (!payload) return;
+    var meta = payload.extracted_meta || {};
+    var metaPairs = Object.keys(meta.meta || {}).map(function (k) {
+      return '<div class="kv"><b>' + k + '</b> ' + String(meta.meta[k]) + "</div>";
+    }).join("");
+    el("step1-body").innerHTML =
+      '<div class="kv"><b>标题</b> ' + (meta.title || "（无）") + "</div>" +
+      '<div class="kv"><b>HTTP 状态码</b> ' + (meta.http_status != null ? meta.http_status : "（未知）") + "</div>" +
+      metaPairs +
+      (payload.screenshot_path
+        ? '<img id="shot-img" alt="整页截图缩略图" src="' + API + payload.screenshot_path + '">'
+        : "");
+  }
+
+  function refreshStep1() {
+    fetch(API + "/api/task/" + state.taskId).then(function (r) {
+      if (!r.ok) throw new Error("snapshot " + r.status);
+      return r.json();
+    }).then(function (snap) {
+      if (snap.payload) renderStep1(snap.payload);
+    }).catch(function () { showConn("后端服务不可达"); });
+  }
+
+  function renderChunk(c) {
+    if (state.seenChunks[c.index]) return;  // 断线重放幂等
+    state.seenChunks[c.index] = true;
+    state.chunkCount += 1;
+    if (state.chunkCount === 1) el("step2-body").innerHTML = "";
+    var div = document.createElement("div");
+    div.className = "chunk-card";
+    var snippet = (c.text || "").slice(0, 120);
+    div.innerHTML = "<b>" + (c.title || "（无标题）") + "</b><p>" + snippet + "</p>" +
+      '<span class="loc">section_path: ' + (c.section_path || "") +
+      " · xpath: " + (c.xpath || "") +
+      " · tokens: " + (c.token_count || 0) + "</span>";
+    el("step2-body").appendChild(div);
+  }
+
+  function renderConclusion(data) {
+    var c = data.conclusion || {};
+    var receipt = data.receipt || {};
+    if (IS_ADMIN) {
+      var body = el("step3-body");
+      var html = '<div class="kv"><b>竞品价格</b> ' + (c.competitor_price || "—") + "</div>" +
+        '<div class="kv"><b>风险等级</b> ' + (c.risk_level || "—") + "</div>" +
+        '<div class="kv"><b>建议动作</b> ' + (c.suggested_action || "—") + "</div>";
+      if (c.insufficient_info) html += '<div class="kv"><i>信息不足结论（未提取到足够内容）</i></div>';
+      if (c.sources && c.sources.length) html += '<div class="kv"><b>溯源</b> ' + c.sources.join("；") + "</div>";
+      body.innerHTML = html;
+      el("regen-btn").disabled = false;
+    }
+    // 页面底部闭环条（SPEC A5 一票否决项的页面侧）
+    var bar = el("receipt-bar");
+    if (receipt.status === "success" && receipt.ticket_id) {
+      bar.textContent = "已模拟写入内部系统（工单号：" + receipt.ticket_id + "）";
+      bar.className = "ok";
+    } else if (receipt.status === "failed") {
+      bar.textContent = "模拟写入失败：" + (receipt.reason || "未知原因");
+      bar.className = "fail";
+    }
+  }
+
+  function renderError(err) {
+    var text = (err && (err.user_message || ERROR_TEXT[err.code])) || "任务失败";
+    if (err && err.code === "ANTI_BOT" && err.http_status) text += "（HTTP " + err.http_status + "）";
+    if (err && (err.code === "FETCH_TIMEOUT" || err.code === "FETCH_FAILED" || err.code === "ANTI_BOT")) showError("step1-error", text);
+    else if (err && err.code === "EMBED_FAILED") showError("step2-error", text);
+    else if (err && (err.code === "GENERATE_FAILED" || err.code === "CONTRACT_VIOLATION")) showError("step3-error", text);
+    else showConn(text);
+    setStatus("Error", err && err.code);
+  }
+
+  function lockTerminal() {
+    state.terminal = true;
+    clearTimeout(state.staleTimer);
+    if (state.es) { state.es.close(); state.es = null; }
+    el("task-submit").disabled = false;
+    if (state.chunkCount === 0 && !el("step2-error").textContent) {
+      el("step2-body").innerHTML = "<p>未提取到有效内容</p>";  // SPEC FP-3 空解析
+    }
+  }
+
+  function connect() {
+    if (state.es) state.es.close();
+    var es = new EventSource(API + "/api/task/" + state.taskId + "/stream");
+    state.es = es;
+    es.addEventListener("progress", function (e) { touch(); setProgress(JSON.parse(e.data).percent || 0); });
+    es.addEventListener("state", function (e) {
+      touch();
+      var d = JSON.parse(e.data);
+      setStatus(d.status, d.detail);
+      if (d.status === "Parsing") refreshStep1();        // Step 1 渲染时机（架构 §2.2）
+      if (d.status === "RAGing" && IS_ADMIN) {
+        var b = el("step3-body");
+        if (d.detail === "重新生成") b.innerHTML = "<p>生成中…</p>";
+      }
+      if (d.status === "Done" || d.status === "Error") lockTerminal();  // 终态收敛（SPEC A9）
+    });
+    es.addEventListener("warning", function (e) {
+      touch();
+      var d = JSON.parse(e.data);
+      showWarn((d && d.message) || "目标页含验证覆盖层，结果已人工可复核");
+    });
+    es.addEventListener("chunk", function (e) { touch(); renderChunk(JSON.parse(e.data)); });
+    es.addEventListener("conclusion", function (e) { touch(); renderConclusion(JSON.parse(e.data)); });
+    es.addEventListener("error", function (e) {
+      touch();
+      try { renderError(JSON.parse(e.data)); } catch (_) { /* EventSource 协议级 error 无 data */ }
+      lockTerminal();
+    });
+    // 断线重连（SPEC FP-5 · 架构 §2.3）：同一 task_id 指数退避，上限后提示刷新
+    es.onerror = function () {
+      if (state.terminal) return;
+      es.close(); state.es = null;
+      if (state.attempts >= state.maxAttempts) {
+        showConn("连接中断，请刷新页面");
+        return;
+      }
+      var delay = BACKOFF_MS[Math.min(state.attempts, BACKOFF_MS.length - 1)];
+      state.attempts += 1;
+      showConn("连接中断，正在重连（第 " + state.attempts + " 次）");
+      clearTimeout(state.timer);
+      state.timer = setTimeout(connect, delay);
+    };
+    es.onopen = function () { state.attempts = 0; touch(); };
+  }
+
+  el("task-form").addEventListener("submit", function (ev) {
+    ev.preventDefault();
+    var url = el("task-url").value.trim();
+    showError("url-error", "");
+    el("task-submit").disabled = true;
+    fetch(API + "/api/task", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url: url })
+    }).then(function (r) {
+      return r.json().then(function (data) { return { ok: r.ok, data: data }; });
+    }).then(function (res) {
+      if (!res.ok) {
+        // T-WEB 失败路径第 1 行：入参非法，输入框旁提示
+        showError("url-error", (res.data && res.data.message) || "请输入合法的目标 URL");
+        el("task-submit").disabled = false;
+        return;
+      }
+      // A1：不经 HTTP 长等待即拿到任务 ID，随后经 SSE 推进
+      state.taskId = res.data.task_id;
+      state.terminal = false; state.attempts = 0; state.chunkCount = 0; state.seenChunks = {};
+      el("receipt-bar").className = ""; el("receipt-bar").style.display = "none";
+      setStatus("Pending", null); setProgress(0);
+      connect();
+    }).catch(function () {
+      showConn("后端服务不可达");  // 部署错误：Flask 页面与 FastAPI 互不可达
+      el("task-submit").disabled = false;
+    });
+  });
+
+  if (IS_ADMIN) {
+    el("regen-btn").addEventListener("click", function () {
+      if (!state.taskId) return;
+      el("regen-btn").disabled = true;
+      el("step3-body").innerHTML = "<p>生成中…</p>";
+      fetch(API + "/api/task/" + state.taskId + "/regenerate", { method: "POST" })
+        .then(function (r) {
+          if (!r.ok) throw new Error("regenerate " + r.status);
+          state.terminal = false; state.attempts = 0;  // 重新打开 SSE 等新一轮 conclusion
+          connect();
+        })
+        .catch(function () { showError("step3-error", "后端服务不可达"); el("regen-btn").disabled = false; });
+    });
+  }
+})();
+</script>
+</body>
+</html>

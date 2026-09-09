@@ -27,3 +27,59 @@
 ## 技术栈（PRD §7）
 
 FastAPI · LangGraph · Playwright · BeautifulSoup · FAISS(MVP)/Qdrant(生产) · Streamlit 或 Flask+Jinja2(MVP 前端)
+## 本地启动（V1 仅本地运行 · 人决 D3）
+
+已验证环境：Python 3.13（`python3 --version` ≥ 3.11 即可；依赖钉版见 `requirements.txt`）。
+
+```bash
+# 1. 创建虚拟环境并安装依赖（pip + requirements.txt · R2 已决，全部 == 钉版）
+python3 -m venv .venv
+.venv/bin/pip install -r requirements.txt
+
+# 2. 安装 Playwright 浏览器（仅 chromium）
+.venv/bin/playwright install chromium
+
+# 3. 配置环境变量（密钥空值占位即可空跑，stub 阶段不调 LLM/Embedding）
+cp .env.example .env
+
+# 4. 双进程启动（架构 §0 拓扑：Flask 仅渲染模板，全部 API 在 FastAPI 进程）
+# 终端 A · FastAPI（API 进程，默认 8000 端口，可用 FASTAPI_PORT 覆盖）
+.venv/bin/uvicorn app.api.main:app --port ${FASTAPI_PORT:-8000}
+# 终端 B · Flask（渲染进程，默认 5000 端口，可用 FLASK_PORT 覆盖）
+.venv/bin/flask --app app.web.app run --port ${FLASK_PORT:-5000}
+```
+
+冒烟验证：
+
+```bash
+curl -i http://127.0.0.1:8000/api/health   # → 200 {"status":"ok"}
+curl -i http://127.0.0.1:5000/             # → 200 首屏 HTML
+.venv/bin/python -m pytest tests -q        # → 104 passed（scaffold + 双子图 + 控制台联调）
+```
+
+打开 `http://127.0.0.1:5000/`（管理员视角 `?role=admin`），输入目标 URL 点「开始调研」即可看到三区块渐进回填与底部工单回执。
+
+演示目标 URL（东财概念极速版 · 人决 D4 修订 · 默认 `TASK_TARGET_URLS` 同款）：
+
+- `https://quote.eastmoney.com/concept/sz000858.html`（五粮液）
+- `https://quote.eastmoney.com/concept/sz300810.html`（中科海讯）
+
+### 已知事项（真机 E2E 实测踩坑 · 2026-09-09）
+
+1. **NO_PROXY 含 `[::1]` 会导致 LLM/Embedding 调用炸 `InvalidURL`**（httpx2 解析 bracketed IPv6 缺陷）。启动服务前净化：
+   ```bash
+   export NO_PROXY=localhost,127.0.0.1,::1   # 去掉 [::1] 项
+   ```
+2. 东财**标准**个股页价格为 JS 异步渲染且可能触发「拖动下方滑块完成拼图」滑块验证（软反爬）。默认目标已切 concept 极速版链接（干扰少）；fetch 节点已加渲染完成确认（networkidle 优先 / domcontentloaded 兜底 + 非占位文本等待，`FETCH_RENDER_TIMEOUT_MS` 可调），检出滑块覆盖层即 ANTI_BOT 终态不解析半成品；仍渲染不出有效内容时结论如实输出 `insufficient_info=true`（铁律一：不降级多模态硬猜）。
+3. live 冒烟默认关：置 `ACQ_LIVE_SMOKE=1` / `RAG_LIVE_SMOKE=1` 才会真实调用外网/SiliconFlow（会烧 Key 额度）。
+
+## 工程结构（task_project_scaffold 底座）
+
+| 路径 | 内容 |
+|------|------|
+| `app/api/` | FastAPI 进程入口与路由（骨架：`GET /api/health`） |
+| `app/web/` | Flask 进程入口 + Jinja2 首屏模板（无任何 /api/* 路由） |
+| `app/graphs/` | LangGraph 三图骨架（supervisor + acquisition + internal_rag，节点全 stub） |
+| `app/config.py` | 全 env 配置读取（python-dotenv）+ 默认值，无硬编码密钥 |
+| `app/static/` | 截图落盘目录（`.gitkeep` 占位，`*.png` 已 gitignore） |
+| `tests/` | 冒烟测试（task_project_scaffold 验收三断言） |

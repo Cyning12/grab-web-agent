@@ -1,0 +1,2 @@
+# 测试路径声明（00 占位 · kit D5 探测逃生口）
+# 真实冒烟测试制品由 task_project_scaffold 的 30 交付（tests/test_smoke.py）。

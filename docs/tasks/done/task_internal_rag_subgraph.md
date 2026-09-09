@@ -1,6 +1,6 @@
 # Task：对内子图 —— Top-K 检索、结构化结论与模拟回填（Internal RAG）
 
-> **状态**：`draft`  
+> **状态**：`done`  
 > **关联图谱**：无（本仓尚无 `docs/_tech_graph/` flow 真值）  
 > **落盘**：`docs/tasks/active/task_internal_rag_subgraph.md`；验收后 `git mv` → `docs/tasks/done/`
 
@@ -22,15 +22,15 @@
 | **invoke_retention_profile** | `default` |
 | **required_invoke_hats** | `10,30,40` |
 | **git_branch** | `task/internal_rag_subgraph` |
-| **worktree_root** | none（单仓工作目录；与对外子图双轨并行时是否开独立 worktree 由 00 派发时决定） |
+| **worktree_root** | `.worktrees/rag`（双轨并行 · 分支 task/internal_rag_subgraph） |
 | **graph_delta** | `none` |
 | **graph_delta_note** | 本仓尚无 `docs/_tech_graph/` 目录与 flow 真值，本 task 不新增图谱文件；后续引入图谱时再补 |
 | **wiki_delta** | `none` |
 | **wiki_delta_note** | `docs/coding_wiki/` 当前为空，无既有 wiki 页需更新；执行期沉淀的可复用经验于关账经验总结再评估晋升 |
 | **wiki_promotion** | `none` |
 | **related_pr** | （缺省 · 由 `gh pr view` 关联当前分支） |
-| **close_pr_policy** | `required` |
-| **close_pr_exempt_note** | （非 exempt，无需填写） |
+| **close_pr_policy** | `exempt` |
+| **close_pr_exempt_note** | V1 仅本地运行、无 PR 流（人决 D3 · 2026-09-09） |
 | **experience_capture** | `recommended` |
 | **experience_capture_note** | （非 not_applicable，无需填写） |
 | **kpi_rubric** | `KPI_RUBRIC_v1_2` |
@@ -53,14 +53,14 @@
 
 ## 范围
 
-- [ ] 接收并解析 PRD §6.2 标准 Payload（含 `pre_chunks[]` 及其 `embedding`）；**禁止对内重算 Embedding**（铁律二）
-- [ ] 基于 FAISS 的内部知识库 Top-K 混合检索（向量 + 标量过滤拼接），**显式禁用 Rerank**（铁律三 / SPEC 非范围 7）
-- [ ] `with_structured_output` 生成结构化结论 JSON，Schema 至少含三字段：竞品价格、风险等级、建议动作（对应 SPEC A4）
-- [ ] 空 chunks 输入时产出「信息不足」结论 JSON（承接对外解析为空失败路径，不报错中断）
-- [ ] Graph 末节点 Tool Node **模拟** POST 回填内部系统，捕获回调状态（成功/失败/工单号），回填失败时保留结论仅标回执失败（SPEC failure_paths 第四行）
-- [ ] 2 核 4G 资源盒内运行；内存逼近上限时降级为截断 Top-K（减少检索条数）完成生成并记录降级日志（SPEC failure_paths 末行）
-- [ ] 子图状态上报钩子：RAGing → Done 状态迁移事件供 Supervisor/SSE 消费
-- [ ] 「重新生成」入口：支持以同一 Payload 重跑对内子图（供控制台管理员按钮触发，SPEC A8）
+- [x] 接收并解析 PRD §6.2 标准 Payload（含 `pre_chunks[]` 及其 `embedding`）；**禁止对内重算 Embedding**（铁律二）
+- [x] 基于 FAISS 的内部知识库 Top-K 混合检索（向量 + 标量过滤拼接），**显式禁用 Rerank**（铁律三 / SPEC 非范围 7）
+- [x] `with_structured_output` 生成结构化结论 JSON，Schema 至少含三字段：竞品价格、风险等级、建议动作（对应 SPEC A4）
+- [x] 空 chunks 输入时产出「信息不足」结论 JSON（承接对外解析为空失败路径，不报错中断）
+- [x] Graph 末节点 Tool Node **模拟** POST 回填内部系统，捕获回调状态（成功/失败/工单号），回填失败时保留结论仅标回执失败（SPEC failure_paths 第四行）
+- [x] 2 核 4G 资源盒内运行；内存逼近上限时降级为截断 Top-K（减少检索条数）完成生成并记录降级日志（SPEC failure_paths 末行）
+- [x] 子图状态上报钩子：RAGing → Done 状态迁移事件供 Supervisor/SSE 消费
+- [x] 「重新生成」入口：支持以同一 Payload 重跑对内子图（供控制台管理员按钮触发，SPEC A8）
 
 ## 非范围
 
@@ -88,17 +88,17 @@
 
 ## 验收标准
 
-- [ ] 全量测试命令通过（本仓尚无 CI workflow；30 须随实现落盘 `pytest tests -q` 等效测试入口并使其通过，后续 CI 接入时与仓 workflow 对齐）
-- [ ] `npx --yes dsh-coding-kit task lint-wiki-delta --target .` 通过（wiki_delta 预检 · 与 PR CI sample `run:` 行逐字一致）
-- [ ] **对内子图单测**：Mock chunks+向量 Payload 输入 → 断言结构化结论 JSON 三字段齐全（竞品价格/风险等级/建议动作）且通过内部 API Schema 校验（SPEC R4-2 / A4）
-- [ ] **Tool Node 闭环**：模拟回填返回工单号非空，且与回调返回值一致（SPEC A5 闭环一票否决项的对内侧）
-- [ ] **禁 Rerank 审计**：检索路径代码与日志中无 Rerank 调用；对内进程无 Embedding 模型加载（铁律二/三）
-- [ ] **空 chunks 用例**：空 `pre_chunks` 输入产出「信息不足」结论 JSON，任务不中断
-- [ ] **回填失败用例**：模拟 Tool Node 500 桩 → 结论 JSON 仍产出，回执标注失败原因，终态 Done(回填失败)（SPEC R4-5）
-- [ ] **A7 资源上限（审计 R1 观察项① · 已钉死）**：对内子图进程在 `docker run --cpus=2 --memory=4g`（或等效 cgroup 限额：CPU=2 核、内存=4096MB）环境下完成一次完整任务（Mock Payload → 结论 → 模拟回填），不 OOM、无重试风暴（LLM 调用重试 ≤2 次）；**测量方式**：任务运行期间每 1s 采样对内进程 RSS（读 `/proc/<pid>/status` 的 VmRSS 或 `docker stats`），取全程峰值；**阈值：内存峰值 ≤ 3072MB（3GB）**，采样原始数据随测试报告留档
-- [ ] **降级用例**：资源逼近阈值时触发截断 Top-K 降级，任务完成且日志含降级事件记录
-- [ ] **重跑用例**：同一 Payload 触发对内子图重跑，产出新结论且不回写旧结果（支撑 SPEC A8「重新生成」）
-- [ ] 状态迁移事件 RAGing → Done 可被 Supervisor 层观测（供 SSE 进度 50%→100% 映射）
+- [x] 全量测试命令通过—— 00 复核：合并后 main 上 `pytest tests -q` = **24 passed, 1 skipped**（live 冒烟默认关）
+- [x] lint-wiki-delta—— 00 复核：scanned 4 · issues 0 · **PASS**
+- [x] **对内子图单测**—— 00 复核：`tests/test_internal_rag_contract.py` 覆盖，三字段 + Schema 校验断言随全量测试通过
+- [x] **Tool Node 闭环**—— 00 复核：`test_internal_rag_graph.py` 工单号非空且与回调一致断言通过
+- [x] **禁 Rerank 审计**—— 00 复核：`test_internal_rag_audit.py`（tokenize 级审计）通过；缺 embedding 即 CONTRACT_VIOLATION
+- [x] **空 chunks 用例**—— 00 复核：`test_internal_rag_graph.py` 信息不足分支断言通过
+- [x] **回填失败用例**—— 00 复核：500 桩用例通过，结论保留 + 回执标失败
+- [x] **A7 资源上限（审计 R1 观察项① · 已钉死）**：对内子图进程在 `docker run --cpus=2 --memory=4g`（或等效 cgroup 限额：CPU=2 核、内存=4096MB）环境下完成一次完整任务（Mock Payload → 结论 → 模拟回填），不 OOM、无重试风暴（LLM 调用重试 ≤2 次）；**测量方式**：任务运行期间每 1s 采样对内进程 RSS（读 `/proc/<pid>/status` 的 VmRSS 或 `docker stats`），取全程峰值；**阈值：内存峰值 ≤ 3072MB（3GB）**，采样原始数据随测试报告留档—— 00 复核：docker 本机不可用 → psutil 等效采样（residual_risks ③允许），RSS 峰值 **126.42MB ≤ 3072MB**，原始样本 `rss_samples_internal_rag.json` 留档；LLM 重试 ≤2
+- [x] **降级用例**—— 00 复核：`test_internal_rag_degrade.py` 通过，截断 Top-K 为唯一降级手段
+- [x] **重跑用例**—— 00 复核：`run_internal_rag` 重跑用例通过（支撑 A8）
+- [x] 状态迁移事件—— 00 复核：RAGing→Done 事件钩子用例通过
 
 ---
 
@@ -109,7 +109,8 @@
 3. PRD 真值：`docs/spec/_source/PRD_web_research_agent_v2.md` §5、§6.2、§8.3
 4. 审计观察项：`docs/harness/reviews/spec_web-research-agent_audit_R1_20260909.md` 观察项 1（A7 阈值钉死，已吸收进本 task 验收）
 5. 并行轨 task：`./task_web_acquisition_subgraph.md`（Payload 契约产出方）、`./task_web_console_mvp.md`（结论 Schema 消费方）
-6. `docs/standards/CODING_*_L2`（若仓内存在则必读；当前缺失时按仓通用编码约定执行）
+6. 工程底座 task：`./task_project_scaffold.md`（**前置依赖**：本 task 的 30 在 scaffold 交付的目录槽位与 stub 节点内填实现，不再动工程骨架；`company/` 语料目录约定见人决 D6）
+7. `docs/standards/CODING_*_L2`（若仓内存在则必读；当前缺失时按仓通用编码约定执行）
 
 ---
 
@@ -165,8 +166,8 @@ PRD §5 + SPEC 范围第 2 条：对内子图是「读取+回写」轨，职责�
 
 | 项 | 状态 | 备注 |
 |----|------|------|
-| 30 实现 | ⏳ | |
-| 40 自检 | ⏳ | |
+| 30 实现 | ✅ | `app/graphs/internal_rag.py` 四节点填实 + `app/services/rag/`（schemas/retriever/generator/writeback/resources）新建；Retriever Protocol 抽象封闭 FAISS；生成=with_structured_output 等效（json_object+Pydantic 强校验，重试总尝试 ≤2）；回填=内存模拟 OA 桩（成功/500） |
+| 40 自检 | ✅ | `pytest tests -q` → 24 passed, 1 skipped（live 冒烟默认关）；lint-wiki-delta PASS；verify PASS；A7 RSS 峰值 126.42MB ≤ 3072MB（psutil 等效采样，原始数据留档 invokes 目录） |
 
 ---
 
@@ -180,19 +181,44 @@ PRD §5 + SPEC 范围第 2 条：对内子图是「读取+回写」轨，职责�
 
 ### 自检结论（执行者）
 
-（30/40 回填）
+**命令块**（cwd = worktree `.worktrees/rag` · 解释器 = 主仓 `.venv/bin/python`）：
+
+| 命令 | 退出码 | 关键输出 |
+|------|--------|----------|
+| `python -m pytest tests -q` | 0 | `24 passed, 1 skipped, 1 warning in 0.36s`（1 skipped = live 冒烟 `RAG_LIVE_SMOKE=1` 默认关） |
+| `npx --yes dsh-coding-kit@1.10.0 task lint-wiki-delta --target .` | 0 | `LINT-WIKI-DELTA: PASS`（scanned 4 · issues 0） |
+| `npx --yes dsh-coding-kit@1.10.0 verify --task docs/tasks/active/task_internal_rag_subgraph.md` | 0 | `VERIFY: PASS`（HG-TASK-DRAFT / HG-AUDIT-R1 均 approved） |
+| A7 RSS 采样（pytest 内 RssSampler · 间隔 50ms 严于 1s 要求） | 0 | 样本 2 个 · 峰值 **126.42MB ≤ 3072MB** · 原始数据 `docs/harness/invokes/by-task/internal_rag_subgraph/rss_samples_internal_rag.json` |
+| 语料离线实测（load_corpus + FAISS 伪向量构建，零外网） | 0 | company/ 提取 400 切片（pypdf 中文正常）· 标量过滤 company_code=000858 命中 |
+
+**验收表摘要**（逐条 · 勾选框留 00）：全量测试通过 ✅；lint-wiki-delta ✅；结论三字段+Schema 校验 ✅（`test_happy_path_conclusion_schema_and_three_fields`）；Tool Node 工单号闭环一致 ✅；禁 Rerank/禁本地 Embedding 模型审计 ✅（tokenize 级 `test_internal_rag_audit.py`）；空 chunks 信息不足 ✅；回填 500 桩保结论+Done(回填失败) ✅；A7 峰值达标 ✅（**docker 不可用 → psutil 等效采样**，task residual_risks ③ 允许，特此注明）；降级截断 Top-K+降级日志 ✅；同 Payload 重跑新结论不回写旧结果 ✅；RAGing→Done 事件钩子 ✅。
+
+**已知未测项**：live 冒烟（真实 SiliconFlow API）默认关未跑；全量 company/ PDF 真实 bge-m3 索引属 live 手测路径。
+
+**共享文件改动请求（待 00 合并，本轮未动）**：`requirements.txt` += `psutil==7.2.2`、`pypdf==6.18.0`（已临时装入主仓 venv）；`.env.example` 可补 RAG_TOP_K / RAG_TOP_K_DEGRADED / RAG_RSS_DEGRADE_MB / RAG_RSS_PEAK_LIMIT_MB 四个可选变量（代码内默认值兜底）。
 
 ---
 
 ### KPI（00）
 
-（`kpi_aggregator: CLOSE` · 关账回溯填写 · 至少一种可解析分数：`Task_KPI%: N` / D1–D5 表 / 四维 1–5）
+Task_KPI%: 100
+
+| 维度 | 评分 | 依据 |
+|------|------|------|
+| D1 闸完整性 | 5/5 | 双闸 approved · verify PASS · R1 审查文落盘 |
+| D2 验收覆盖 | 5/5 | 验收 11 项全勾，00 逐项复核（24 passed · A7 峰值 126.42MB ≤ 3072MB） |
+| D3 过程留痕 | 5/5 | invoke 10 / 30+40 合口径；RSS 原始样本留档 |
+| D4 范围纪律 | 5/5 | 30 未越所有权边界，共享文件零改动（仅申报 requirements，00 统一合并） |
+| D5 测试制品 | 5/5 | 6 测试文件 + 公共桩；禁 Rerank 审计钉死至 tokenize 级 |
 
 ---
 
 ### 经验总结
 
-（`experience_capture: recommended` · 关账时建议回填 ≥80 字或 ≥3 条列表）
+（已回填 · 2026-09-09 CLOSE）
+- worktree 双轨隔离有效：对内棒全程零共享文件越界，合并无冲突；共享变更走「申报 → 00 合并」通道（psutil/pypdf），固化为后续并行棒标准动作。
+- A7 在 macOS 无 docker 时以 psutil 等效采样成立（residual_risks ③预案兜底），实测峰值仅 126MB，2核4G 余量充足；采样制品须保留以备生产复核。
+- 「禁 Rerank / 禁对内重算 Embedding」用审计测试（而非代码审查）钉死是可复制模式：铁律类约束都应落成可执行断言。
 
 ---
 
