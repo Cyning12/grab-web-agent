@@ -181,8 +181,46 @@ PRD §3（新增核心章节）+ §8.2/8.3：控制台是用户唯一触点，�
 
 | 项 | 状态 | 备注 |
 |----|------|------|
-| 30 实现 | ⏳ | |
-| 40 自检 | ⏳ | |
+| 30 实现 | ✅ | 2026-09-09 · 详见下表与自检结论 |
+| 40 自检 | ✅ | 2026-09-09 · 全量 104 passed + lint-wiki-delta PASS |
+
+### 30 交付清单
+
+- `app/services/console/registry.py`（新建）：任务注册表内存态（架构 §1.1 字段表逐一对齐）+ 每订阅者 asyncio.Queue 广播 + 事件历史回放（SSE 断线补拉语义）+ 全事件落日志（SPEC FP-5「内存态可接受，须日志可查」）。
+- `app/graphs/supervisor.py`（重写薄壳）：`execute_task` 异步编排串 对外子图真实入口 `build_acquisition_graph().invoke` → 对内真实入口 `run_internal_rag`；状态机 Pending→Fetching(10%)→Parsing(50%，逐条 chunk)→RAGing→Done(100%) 与架构 §1.5 触发表逐行对齐；失败收敛 error+Error / Done(回填失败)；子图入口可注入（测试 Mock 驱动）。`build_supervisor_graph` LangGraph 同步包装保留（scaffold 冒烟契约：Mock 输入空跑 Done/100，事件化编排以 execute_task 为准）。
+- `app/api/main.py`（填实）：POST /api/task（SSRF 复用对外轨 validate_target_url，违例 400「请输入合法的目标 URL」不建任务）· GET /api/task/{id}/stream（纯 Starlette StreamingResponse 手写 text/event-stream，零新依赖；订阅即回放历史 + 15s 心跳 + 终态关流；未知任务 error{TASK_NOT_FOUND}）· GET /api/task/{id} 快照补拉 · POST /api/task/{id}/regenerate（404/409 守卫；状态先同步翻 RAGing 再后台重跑）· /static 挂载 app/static（截图缩略图）· CORS 放行（V1 本地双进程）。后台任务强引用集防 GC。
+- `app/web/app.py` + `app/web/templates/index.html`（填实）：Flask 仅渲染（零 /api/* 路由），?role=admin 服务端条件渲染 Step 3 + 重新生成按钮；vanilla JS：fetch 提交、EventSource 订阅五类事件、三区块按架构 §2.2 渲染时机回填、指数退避重连（1/2/4/8/16s 上限 5 次，15s 停滞提示「连接中断，正在重连」，超上限「请刷新页面」）、终态锁定、底部闭环横幅「已模拟写入内部系统（工单号：xxx）」逐字取自 receipt.ticket_id。
+- `tests/test_web_console_api.py`（12 例）：入参校验 ×6、异步提交、快照 404、regenerate 守卫、拓扑双向断言、A8 角色视图 ×2、A5 页面侧静态断言。
+- `tests/test_web_console_sse.py`（12 例）：Mock 对外桩 + 对内真实图（FakeLLM/FakeRetriever/内存 OA 桩）全链联调：A1 事件序列、A5 工单号闭环、断线重放、TASK_NOT_FOUND、A9 失败注入（超时/反爬/回填 500/生成重试耗尽）、空解析信息不足、A8 重新生成新工单不回写旧结果。
+
+### 自检结论（执行者）
+
+**验证命令**（workdir=`.worktrees/web`，解释器=主仓 `.venv/bin/python`）：
+
+| # | 命令 | 退出码 | 关键输出 |
+|---|------|--------|----------|
+| 1 | `python -m pytest tests/ -q` | 0 | **104 passed, 2 skipped**（基线 80 passed 全保持；新增 24 例全绿） |
+| 2 | `npx --yes dsh-coding-kit@1.10.0 task lint-wiki-delta --target .` | 0 | LINT-WIKI-DELTA: PASS（missing 0 · issues 0） |
+| 3 | `npx --yes dsh-coding-kit@1.10.0 verify --task docs/tasks/active/task_web_console_mvp.md` | 0 | VERIFY: PASS |
+| 4 | 实机双进程冒烟：uvicorn :18000 + flask :15000 | 0 | /api/health ok；admin 页含 step3、调研员页不含；file:// 入参 400「请输入合法的目标 URL」；未知任务 SSE 返回 error{TASK_NOT_FOUND} |
+
+**验收逐条对照**（勾选框未动，待 50/CLOSE 勾选）：
+
+- 全量测试命令通过 → ✅ 命令 1（本仓无 CI workflow；E2E 联调以 pytest 留痕于上述两测试文件）
+- lint-wiki-delta → ✅ 命令 2
+- A1 → ✅ test_a1_sse_event_sequence：state 序列 Pending→Fetching→Parsing→RAGing→Done、progress 序列 [10,50,100]；POST 201 立即返回 task_id
+- A2 → ✅ 数据源：注册表 payload.screenshot_path（经 /static）+ extracted_meta（含 http_status）；渲染时机=state{Parsing} 后快照补拉（模板 renderStep1）；实机冒烟确认 /static 已挂载
+- A3 → ✅ chunk 事件 ×3 逐条，含 title/text/section_path/xpath/token_count∈[512,1024]
+- A4 → ✅ conclusion 事件含三字段结构化 JSON（test_a5 断言字段集）
+- A5（一票否决）→ ✅ test_a5_closed_loop_ticket_matches_writeback_callback：receipt.ticket_id 非空且 == InMemoryOAEndpoint.issued_tickets[-1]；模板含「已模拟写入内部系统（工单号：」横幅且工单号逐字取自 receipt.ticket_id
+- A8 → ✅ 调研员 HTML 无 step3-conclusion；?role=admin 有 step3 + 重新生成按钮；test_a8_regenerate_reruns_internal_rag：新工单 ≠ 旧工单、注册表整体替换（不回写旧结果）
+- A9 → ✅ 失败注入四桩：FETCH_TIMEOUT / ANTI_BOT（error+终态 Error+用户文案）· 回填 500（conclusion 照出 + receipt.failed + Done(回填失败)）· GENERATE_FAILED（重试 ≤2 耗尽 → Error）
+- SSE 断线演练 → ✅ test_sse_reconnect_replays_full_state：完成后重订阅回放全量历史（补拉无空洞）；前端指数退避重连 + 超上限提示刷新（模板静态可查）
+- 拓扑确认 → ✅ test_topology_*：Flask url_map 零 /api/* 路由；四端点 + /static 仅存在于 FastAPI 路由表
+
+**已知未测项**：① 真实浏览器端渲染（纪律禁止，页面侧以模板静态断言 + SSE 契约测试替代）；② 真实目标页 + 真实 LLM 的实弹 E2E（需外网/Key，留人工演示）；③ 并发多任务广播串扰未专项压测（V1 单任务场景，PRD §2.2）。
+
+**共享冻结文件**：零改动（requirements.txt / config.py / .env.example / 双子图 / services/acquisition / services/rag / README.md 均未触碰）。
 
 ---
 
@@ -196,7 +234,7 @@ PRD §3（新增核心章节）+ §8.2/8.3：控制台是用户唯一触点，�
 
 ### 自检结论（执行者）
 
-（30/40 回填）
+（已并入上方「实现备忘」节内回填，见其中「自检结论（执行者）」小节）
 
 ---
 
