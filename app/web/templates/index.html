@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>智能网页调研 Agent</title>
+</head>
+<body>
+  <h1>智能网页调研 Agent</h1>
+  <!-- 首屏骨架（架构 §2.1）：输入框 + 开始调研按钮 + 三区块容器 + 底部回执条。
+       动态行为（fetch / EventSource / 角色视图）属下游 task_web_console_mvp 范围，骨架不含。 -->
+  <form id="task-form">
+    <input id="task-url" type="url" placeholder="请输入目标 URL" required>
+    <button id="task-submit" type="submit">开始调研</button>
+  </form>
+  <main>
+    <section id="step1-preview">
+      <h2>Step 1 · 页面预览</h2>
+    </section>
+    <section id="step2-chunks">
+      <h2>Step 2 · 知识切片</h2>
+    </section>
+    <section id="step3-conclusion">
+      <h2>Step 3 · 结论回填</h2>
+    </section>
+  </main>
+  <footer id="receipt-bar"></footer>
+</body>
+</html>
