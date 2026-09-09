@@ -6,3 +6,4 @@ __pycache__/
 # 截图落盘（app/static/ 经 .gitkeep 白名单保留占位）
 *.png
 !app/static/.gitkeep
+.worktrees/
