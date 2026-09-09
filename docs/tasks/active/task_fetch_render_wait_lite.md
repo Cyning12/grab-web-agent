@@ -41,7 +41,7 @@
 | human_gate_id | status | blocks_hats | 说明 |
 |---------------|--------|-------------|------|
 | HG-TASK-DRAFT | approved | 22-R1, 30 | 00 代签 2026-09-09（授权：AUTHORIZATION_00_signoff_20260909.md） |
-| HG-AUDIT-R1 | pending | 30 | 22 R1 落盘后签（同上授权） |
+| HG-AUDIT-R1 | approved | 30 | 20-task-audit R2 PASS · 00 代签 2026-09-09（授权在案） |
 
 ---
 
