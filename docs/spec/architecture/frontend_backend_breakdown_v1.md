@@ -319,6 +319,7 @@ Flask 仅交付首屏 HTML 骨架（输入框 + 「开始调研」按钮 + 三�
 | D5 | SiliconFlow 模型选型 | 生成：`deepseek-ai/DeepSeek-V4-Flash`；Embedding：`bge-m3`（BAAI/bge-m3） | 人决（P2 闭环）；全部经 `.env` 可配置，不落盘明文 Key；30 施工以 env 变量名为唯一引用 |
 | D6 | 内部语料目录约定 | `company/` 按**上市编号**命名区分（如 `company/sz000858/`、`company/sz300810/`） | 样例已人工保存；**后续**补抓取脚本（cninfo 全文检索 → 按编号落盘），单独立 task，不占本批 30 范围 |
 | D7 | 滑块检出语义 | **放宽为「警告但继续」**：渲染确认探针通过（内容非占位）则继续解析，结论标注「页面含验证覆盖层」，SSE 增 `warning` 事件；探针不通过才 ANTI_BOT 终态 | 真机实证：滑块为悬浮覆盖层、背景 DOM 已完整渲染（截图 ×2 00 亲验）；严格拦截在本机 IP 持续被反爬时不可达 Done。不主动绕过验证（V2 反爬仍排除） |
+| D8 | 对外默认抓取目标站点 | **切换为腾讯自选股**：`https://gu.qq.com/sz000858/gp`（五粮液）、`https://gu.qq.com/sz300810/gp`（中科海讯）（`.env.example` TASK_TARGET_URLS 与 README 同步） | 东财对本机 IP 持续下发滑块验证（残余风险实锤 · task_fetch_render_wait_lite 真机 6 连命中）；用户实测腾讯暂无反爬（2026-09-09 会话原话「腾讯的暂时未发现反抓取」）。东财旧链仍可手动输入但不保证成功率（保遗留痕：D4/D7 与 README 已知事项 2 不删）；腾讯若后续上线反爬，按既有 ANTI_BOT/超时失败路径落终态 |
 
 ---
 
@@ -331,3 +332,4 @@ Flask 仅交付首屏 HTML 骨架（输入框 + 「开始调研」按钮 + 三�
 | 2026-09-09 | 00 落盘人决 D1–D3（§5 决策记录）：单仓 monorepo · SiliconFlow · V1 仅本地运行；§1.6 同步修订 |
 | 2026-09-09 | 00 落盘人决 D4–D6：MVP 场景=东财股票页 ×2 + 巨潮财报语料 · 模型=DeepSeek-V4-Flash + bge-m3 · company/ 语料目录约定 |
 | 2026-09-09 | 30 补 D4 修订注（task_fetch_render_wait_lite）：对外目标页默认切 concept 极速版 + fetch 渲染完成确认/滑块检出 |
+| 2026-09-09 | 30 落盘人决 D8（task_switch_target_gu_qq）：默认抓取目标切腾讯 gu.qq.com 双链（§5 决策记录增 D8 行） |
