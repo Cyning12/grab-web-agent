@@ -1,6 +1,6 @@
 # Task：抓取目标切换腾讯 gu.qq.com 与双股票真机验收（switch_target_gu_qq）
 
-> **状态**：`draft`  
+> **状态**：`done`  
 > **关联图谱**：无  
 > **落盘**：`docs/tasks/active/task_switch_target_gu_qq.md`；验收后 `git mv` → `docs/tasks/done/`
 
@@ -53,11 +53,11 @@
 
 ## 范围
 
-- [ ] 默认目标 URL 切换：`.env.example` `TASK_TARGET_URLS` 与 README 更新为 `https://gu.qq.com/sz000858/gp`、`https://gu.qq.com/sz300810/gp`；架构文档 §5 增 D8 决策行
-- [ ] **腾讯页全管道实测与最小解析适配**：30 真机跑通腾讯页；若 parse_dom/chunker 对其结构提取为空或过碎，允许最小适配（限 `app/services/acquisition/parser.py` 选择器/语义规则增补；chunker 仅在切分明显不合法时动）
-- [ ] **腾讯页 HTML fixture**：真机落一份页面快照为 fixture，新增解析/切分用例（切片非空、section_path/xpath 非空、无「-」全占位正文）
-- [ ] **双股票真机验收**：sz000858 与 sz300810 各一次全管道（SSE 流 + 截图 + 结论 + 工单号写入实现备忘；截图留 app/static/ 供 00 看图）
-- [ ] **旧测影响面（K7）**：grep tests/ 旧东财 URL 引用，按语义逐条处置（保留作反爬/失败注入语义的保留，作默认目标的改腾讯）
+- [x] 默认目标 URL 切换：`.env.example` `TASK_TARGET_URLS` 与 README 更新为 `https://gu.qq.com/sz000858/gp`、`https://gu.qq.com/sz300810/gp`；架构文档 §5 增 D8 决策行—— 00 复核：双链切换 + 架构 §5 D8 行落盘
+- [x] **腾讯页全管道实测与最小解析适配**：30 真机跑通腾讯页；若 parse_dom/chunker 对其结构提取为空或过碎，允许最小适配（限 `app/services/acquisition/parser.py` 选择器/语义规则增补；chunker 仅在切分明显不合法时动）—— 00 复核：parser 最小增补 ×2（纯标签跳过 + title 兜底），chunker 零改动（判定实例留痕）
+- [x] **腾讯页 HTML fixture**：真机落一份页面快照为 fixture，新增解析/切分用例（切片非空、section_path/xpath 非空、无「-」全占位正文）—— 00 复核：tests/fixtures/gu_qq_sz000858.html 真机快照落盘
+- [x] **双股票真机验收**：sz000858 与 sz300810 各一次全管道（SSE 流 + 截图 + 结论 + 工单号写入实现备忘；截图留 app/static/ 供 00 看图）—— 00 复核：双 SSE 流 + 截图 + 结论 + 工单号写入实现备忘
+- [x] **旧测影响面（K7）**：grep tests/ 旧东财 URL 引用，按语义逐条处置（保留作反爬/失败注入语义的保留，作默认目标的改腾讯）—— 00 复核：26 处处置=改腾讯 8 / 保留东财 18，处置后复跑与标注逐条一致
 
 ## 非范围
 
@@ -79,12 +79,12 @@
 
 ## 验收标准
 
-- [ ] 全量测试命令通过（`.venv/bin/python -m pytest tests -q` 全绿；基线 129 collected = 127 passed + 2 skipped 不回退——20 审实测复核）
-- [ ] `npx --yes dsh-coding-kit task lint-wiki-delta --target .` 通过
-- [ ] **fixture 解析断言**：腾讯页 fixture → 切片 ≥1 且 section_path/xpath 非空、正文非全占位
-- [ ] **旧测影响面处置完毕**：grep 命中逐条标注且与处置一致
-- [ ] **双股票真机闭环（一票否决级）**：两个 URL 各自 Pending→…→Done + 工单号非空；截图 00 人工看图（无蒙层、内容真实）
-- [ ] **默认 URL 断言**：.env.example/README 双链为 gu.qq.com
+- [x] 全量测试命令通过（`.venv/bin/python -m pytest tests -q` 全绿；基线 129 collected = 127 passed + 2 skipped 不回退——20 审实测复核）—— 00 复核：合并后 main = **131 passed, 2 skipped**（collect 133 · 基线 129 零回退）
+- [x] `npx --yes dsh-coding-kit task lint-wiki-delta --target .` 通过—— 00 复核：PASS
+- [x] **fixture 解析断言**：腾讯页 fixture → 切片 ≥1 且 section_path/xpath 非空、正文非全占位—— 00 复核：test_acquisition_parser_gu_qq.py + 真机快照 fixture 随全量通过（price 真值提取断言含）
+- [x] **旧测影响面处置完毕**：grep 命中逐条标注且与处置一致—— 00 复核：26 处处置=改腾讯 8 / 保留东财 18，处置后复跑与标注逐条一致
+- [x] **双股票真机闭环（一票否决级）**：两个 URL 各自 Pending→…→Done + 工单号非空；截图 00 人工看图（无蒙层、内容真实）—— 00 **人工看图 ×2**：sz000858（71.16 已收盘 · 无蒙层 · 工单 MOCK-19A83A73）与 sz300810（27.73 +11.59% · 无蒙层 · 工单 MOCK-CE85445C）双 Done 闭环
+- [x] **默认 URL 断言**：.env.example/README 双链为 gu.qq.com—— 00 复核：.env.example/README 双链已切 gu.qq.com
 
 ---
 
@@ -140,13 +140,24 @@
 
 ### KPI（00）
 
-（`kpi_aggregator: CLOSE` · 关账回溯填写）
+Task_KPI%: 100
+
+| 维度 | 评分 | 依据 |
+|------|------|------|
+| D1 闸完整性 | 5/5 | 双闸代签 · R1 PASS（审查员亲验 grep/pytest 数字吻合）· verify PASS |
+| D2 验收覆盖 | 5/5 | 验收全勾；双股票真机闭环经 00 人工看图 ×2（真价 71.16 / 27.73 · 无蒙层） |
+| D3 过程留痕 | 5/5 | invoke 三段齐；fixture 真机快照 + 双截图 + 双工单留档；子 Agent 中断后现场被 00 盘点无损接续（教训落经验） |
+| D4 范围纪律 | 5/5 | 共享文件零越界；chunker 零改动判定留痕；旧测 26 处逐条处置 |
+| D5 测试制品 | 5/5 | 净增 4 用例零回退（131 passed） |
 
 ---
 
 ### 经验总结
 
-（`experience_capture: recommended` · 关账时建议回填）
+（已回填 · 2026-09-09 CLOSE）
+- **换站比攻坚反爬便宜得多**：东财滑块攻坚属 V2 代理池范畴；切腾讯页后真价（71.16/27.73）直接可提取——数据源选型是采集系统的第一层架构决策。
+- **价格提取的「纯标签陷阱」**：`span#price` 命中了「分价」标签文本而非价格（真价在 title/专用节点）——语义提取须「值形态校验」（无数字命中跳过 + 兜底源），不能只看选择器命中。
+- **子 Agent 中断现场可无损接续**：本 task 的 30 在完工前失败，worktree 未提交但磁盘完好；00 盘点（git status + pytest 复跑）确认后续派同 Agent 收尾——worktree 隔离 + 分支即交付物的纪律让中断恢复成本为零。
 
 ---
 
