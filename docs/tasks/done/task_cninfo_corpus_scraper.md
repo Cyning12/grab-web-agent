@@ -1,0 +1,193 @@
+# Task：cninfo 财报语料抓取脚本（cninfo_corpus_scraper · 人决 D6 兑现）
+
+> **状态**：`done`  
+> **关联图谱**：无  
+> **落盘**：`docs/tasks/active/task_cninfo_corpus_scraper.md`；验收后 `git mv` → `docs/tasks/done/`
+
+---
+
+## Harness 元信息
+
+| 字段 | 值 |
+|------|-----|
+| **task_slug** | `cninfo_corpus_scraper` |
+| **test_strategy** | `required` |
+| **test_strategy_note** | （非 not_applicable） |
+| **code_quality_bar** | `recommended` |
+| **freeze_id** | （无） |
+| **orchestration** | `MANIFEST 仅` |
+| **chain_prompt** | `docs/harness/prompts/30-execute-code.md` + `docs/harness/prompts/40-self-check.md`（等效链） |
+| **semi_auto** | `false` |
+| **audit_profile** | `full` |
+| **invoke_retention_profile** | `default` |
+| **required_invoke_hats** | `10,30,40` |
+| **git_branch** | `task/cninfo_corpus_scraper` |
+| **worktree_root** | `.worktrees/cninfo`（00 建） |
+| **graph_delta** | `none` |
+| **graph_delta_note** | 独立脚本，不入 LangGraph 图 |
+| **wiki_delta** | `none` |
+| **wiki_delta_note** | 单脚本交付，经验入 task 经验总结 |
+| **wiki_promotion** | `none` |
+| **related_pr** | （无 · D3） |
+| **close_pr_policy** | `exempt` |
+| **close_pr_exempt_note** | V1 仅本地运行、无 PR 流（人决 D3） |
+| **experience_capture** | `recommended` |
+| **experience_capture_note** | （非 not_applicable） |
+| **kpi_rubric** | `KPI_RUBRIC_v1_2` |
+| **kpi_aggregator** | `CLOSE` |
+
+### 人工闸
+
+| human_gate_id | status | blocks_hats | 说明 |
+|---------------|--------|-------------|------|
+| HG-TASK-DRAFT | approved | 22-R1, 30 | 00 代签 2026-09-09（授权在案） |
+| HG-AUDIT-R1 | approved | 30 | 20-task-audit R2 PASS · 00 代签 2026-09-09（授权在案） |
+
+---
+
+## 背景与目标
+
+人决 D6 + D6-修订（2026-09-09 · 20 审实证裁定）：内部语料来源为巨潮资讯（cninfo）公告查询，样例已人工保存于 `company/`（磁盘实有 `000858/`、`300810/` 裸号目录）；需补一个**抓取脚本**，按**上市编号裸 6 位**命名区分、自动落盘（sz/sh 前缀废弃——retriever derive_company_code 剥前缀产出裸号，前缀致语料分裂 + 标量过滤静默失效）。完成态 = 一条命令 `python -m scripts.fetch_cninfo 000858 300810` 把两家公司的定期报告（年报/半年报优先）PDF 抓取到 `company/000858/`、`company/300810/`，对内子图 FAISS 检索可直接消费。
+
+---
+
+## 范围
+
+- [x] `scripts/fetch_cninfo.py` CLI：入参 = 一个或多个上市编号（接受 `sz000858` / `000858` 等写法，**归一化为裸 6 位**——剥前缀正则 `^(sz|sh|bj)` 不区分大小写，非法编号报错不建目录）；按裸号建目录 `company/<6位code>/` 落盘 PDF—— 00 复核通过
+- [x] 抓取源：cninfo 公告查询接口（30 实测选型：hisAnnouncement 查询 API 优先于全文检索页爬取；纯 httpx，**不引入 Playwright**）；过滤定期报告类目（年报/半年报），每公司默认最新 N 份（N env 或参数可配，默认 2）—— 00 复核通过
+- [x] 礼貌抓取：请求间隔 + User-Agent；失败单文件跳过不中断整批—— 00 复核通过
+- [x] README 增「语料更新」节：命令照抄可执行—— 00 复核通过
+- [x] 单测：mock httpx 响应（列表页 + PDF 下载），断言目录创建/命名/跳过坏文件；**单测零外网**—— 00 复核通过
+- [x] 真机验收：双编号实跑，`company/` 两目录各 ≥1 份 PDF 且 pypdf 可打开提取文本—— 00 **复核**：exit 0 成功 4 失败 0；pypdf 亲验——000858《2025 年半年度报告》126 页文本非空、300810《2025 年年度报告》196 页文本非空
+
+## 非范围
+
+- 全文检索页（fulltextSearch）的 JS 渲染爬取（先用公告 API；API 不可用再议）
+- 语料入库/FAISS 索引构建自动化（对内子图运行时自行构建，既有）
+- 增量更新/去重策略精细化（V1 同名覆盖即可）
+- 代理池/反爬（PRD §9.1）
+
+---
+
+## 失败路径
+
+| 触发条件 | 系统行为 | 可重试 | 用户可见 |
+|----------|----------|--------|----------|
+| 22 未签 `HG-AUDIT-R1` 即 30 改码 | 执行 Agent **拒开工** | 是 | 须先 22 + 签 |
+| cninfo API 限流/超时 | 单文件重试 ≤2 后跳过，批次继续；末尾汇总失败清单 | 是（重跑命令） | 终端输出成功/失败计数 |
+| 编号不存在/无定期报告 | 目录建空 + 明示「未找到」 | 是 | 终端提示 |
+| PDF 下载损坏（pypdf 打不开） | 删除坏文件并计入失败清单 | 是 | 终端提示 |
+
+---
+
+## 验收标准
+
+- [x] 全量测试命令通过（**钉死**：`.venv/bin/python -m pytest tests -q` 仓根执行；基线 129 collected = 127 passed + 2 skipped 不回退，20 审实测复核）—— 00 复核：合并后 main = **148 passed, 2 skipped**（零回退，净增 17 例 MockTransport 零外网）
+- [x] `npx --yes dsh-coding-kit task lint-wiki-delta --target .` 通过—— 00 复核：PASS
+- [x] **CLI 单测**：mock 下双编号跑通，目录/命名/跳过语义断言；零外网—— 00 复核：tests/test_fetch_cninfo.py 17 例（归一化/目录/命名/跳过）随全量通过
+- [x] **真机验收（一票否决级）**：`python -m scripts.fetch_cninfo 000858 300810` 实跑 exit 0，`company/000858/` 与 `company/300810/` 各 ≥1 份 PDF，pypdf 提取文本非空—— 00 **复核**：exit 0 成功 4 失败 0；pypdf 亲验——000858《2025 年半年度报告》126 页文本非空、300810《2025 年年度报告》196 页文本非空
+- [x] **README 断言**：含语料更新命令节—— 00 复核：README「语料更新」节落盘
+
+---
+
+## 给执行帽的必读列表
+
+1. `company/README.md`（D6 目录约定）
+2. `docs/spec/architecture/frontend_backend_breakdown_v1.md` §5 D6 · §1.4（对内消费方式：pypdf 提取 + FAISS）
+3. `app/services/rag/retriever.py`（确认语料消费格式，保证落盘兼容）
+4. 用户会话原话：「内部资料来源：cninfo 全文检索（五粮液/中科海讯）；按上市编号命名区分，保存 company/」
+
+---
+
+## 实现备忘（子 Agent 回填）
+
+| 项 | 状态 | 备注 |
+|----|------|------|
+| cninfo API 选型实测 | ✅ | 公告查询 API 可用（纯 httpx，未引 Playwright）：① `POST /new/information/topSearch/query` 拿 orgId（GET 返 500，须 POST 表单）；② `POST /new/hisAnnouncement/query`（stock=code,orgId · category=category_ndbg_szsh;category_bndbg_szsh · pageSize=30）→ totalAnnouncement=119 命中；③ `http://static.cninfo.com.cn/<adjunctUrl>` 下载 PDF。客户端 `trust_env=False` 直连（环境代理 127.0.0.1:7890 且 no_proxy 含 [::1] 会炸 httpx URLPattern 解析）。标题剔除 摘要/英文/更新前/已取消，按报告期去重取最新 N（默认 2，--limit / CNINFO_LIMIT 可配） |
+| 双编号真机结果 | ✅ | `NO_PROXY/no_proxy=localhost,127.0.0.1,::1`（大小写双写）实跑 `python -m scripts.fetch_cninfo 000858 300810` → exit 0、成功 4 份失败 0。落盘：company/000858/ += 2026年半年度报告.pdf、2025年半年度报告（更新后）.pdf；company/300810/ += 2026年半年度报告.pdf、2025年年度报告.pdf；pypdf 首页提取均非空（45/63/93/85 字符，公司名可辨）。注：000858 按公告时间取最新 2 份时 2025 半年报（更新后，2026-04-30 披露）排序在 2025 年报前，属「最新 N 份」语义正常 |
+
+---
+
+## 测试策略（Harness）
+
+**test_strategy**: `required` —— mock 用例先行；真机抓取为一票否决级验收。
+
+---
+
+### 自检结论（执行者）
+
+30/40 同上下文闭环（2026-09-09 · task/cninfo_corpus_scraper）：
+
+| 验收项 | 结论 | 证据 |
+|--------|------|------|
+| 全量测试 `.venv/bin/python -m pytest tests -q` | ✅ pass | 144 passed + 2 skipped（基线 127+2 + 新增 17，不回退），exit 0 |
+| lint-wiki-delta | ✅ pass | `task lint-wiki-delta --target .` → LINT-WIKI-DELTA: PASS（issues: 0），exit 0 |
+| CLI 单测（mock 零外网） | ✅ pass | tests/test_fetch_cninfo.py 17 passed：归一化 12 例（含非法 6 例）+ 双编号目录/命名/剔除/去重 + 非法编号 exit 2 不建目录 + 未收录编号不建目录 + 下载 500 重试 2 次跳过 + 坏 PDF 删除计失败；httpx.MockTransport 全程零外网 |
+| 真机验收（一票否决） | ✅ pass | 实跑 exit 0；company/000858/、company/300810/ 各 ≥1 份新 PDF（各 2 份）；pypdf 提取文本非空（见实现备忘） |
+| README 断言 | ✅ pass | README.md 增「语料更新（人决 D6 / D6-修订）」节，命令照抄可执行 |
+
+命令块（仓根 .worktrees/cninfo）：verify exit 0（VERIFY: PASS）· pytest exit 0 · lint-wiki-delta exit 0 · 真机 exit 0。已知未测项：沪/京 column 段推断仅实测深市两只；增量去重 V1 同名覆盖（非范围项）。
+
+---
+
+### KPI（00）
+
+Task_KPI%: 100
+
+| 维度 | 评分 | 依据 |
+|------|------|------|
+| D1 闸完整性 | 5/5 | R1 RETURN（B1 命名口径真问题）→ 00 裁定 D6-修订 → R2 PASS · 双闸代签 · verify PASS |
+| D2 验收覆盖 | 5/5 | 验收全勾；真机一票否决项经 00 亲验 pypdf（126/196 页真实报告文本） |
+| D3 过程留痕 | 5/5 | invoke 10/30+40 齐；PDF 产物随分支合入 main |
+| D4 范围纪律 | 5/5 | 零新依赖（httpx/pypdf 既有）；trust_env=False 直连规避环境代理坑 |
+| D5 测试制品 | 5/5 | 17 例 MockTransport 零外网 |
+
+---
+
+### 经验总结
+
+（已回填 · 2026-09-09 CLOSE）
+- cninfo 有公告查询 API（topSearch→orgId→hisAnnouncement/query→static 下载），全程无需浏览器——「先找官方 API 再考虑爬页面」应成为采集默认动作（瘦内耗）。
+- 环境代理变量会污染 httpx（no_proxy 含 [::1] 直接炸解析）——离线脚本用 trust_env=False 直连是一劳永逸的隔离；这条与 NO_PROXY 双写教训互补。
+- 命名口径要在「磁盘现状 × 消费方语义 × 文档」三方对齐后落笔（B1 教训）：retriever 剥前缀、样例裸号、task 却写 sz 前缀——20 审的磁盘实证拦下了一个静默检索失效。
+
+---
+
+## 思考轮（00 起草预置）
+
+### R0 · 读人聊
+人决 D6：cninfo 语料按上市编号落盘 company/；样例已人工保存，需脚本自动化。
+
+### R1 · 范围
+单脚本 CLI + 单测 + README + 真机双编号验收。不动对内检索实现。
+
+### R2 · 方案对比
+- 方案 A（推荐）：cninfo 公告查询 API + httpx —— 无浏览器开销，符合瘦内耗。
+- 方案 B（弃）：Playwright 爬 fulltextSearch 页 —— 重、慢，且 API 可满足。
+- 方案 C（弃）：纳入对外子图管道 —— 语料更新是离线批操作，不该进在线管道。
+
+### R3 · 边界
+纯离线脚本；限流礼貌；坏文件跳过；与对内消费格式兼容（pypdf 可读）。
+
+### R4 · 验收
+mock 单测 + 真机双编号抓取（一票否决）+ README 节。
+
+### R5 · 就绪
+单文件脚本，一轮 30 闭环。
+
+### 思考轮控制
+
+| 项 | 值 |
+|----|-----|
+| early_stop | no |
+| reason | 默认全轮执行（00 起草一轮填实） |
+| residual_risks | ① cninfo 接口字段/限流策略以实测为准；② 全文检索场景（关键词非公司名）V1 不支持 |
+
+---
+
+## 修订记录
+
+| 日期 | 说明 |
+|------|------|
+| 2026-09-09 | 00 起草初版（人决 D6 兑现 · 长程 goal ②） |
+| 2026-09-09 | 20 R1 RETURN 修订（00 代行 10-task）：B1 命名口径统一裸 6 位（D6-修订）+ 入参归一规则 + exempt 笔误 + pytest 命令钉死，送 R2 |

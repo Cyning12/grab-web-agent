@@ -59,10 +59,12 @@ curl -i http://127.0.0.1:5000/             # → 200 首屏 HTML
 
 打开 `http://127.0.0.1:5000/`（管理员视角 `?role=admin`），输入目标 URL 点「开始调研」即可看到三区块渐进回填与底部工单回执。
 
-演示目标 URL（东财概念极速版 · 人决 D4 修订 · 默认 `TASK_TARGET_URLS` 同款）：
+演示目标 URL（腾讯自选股 · 人决 D8 · 默认 `TASK_TARGET_URLS` 同款）：
 
-- `https://quote.eastmoney.com/concept/sz000858.html`（五粮液）
-- `https://quote.eastmoney.com/concept/sz300810.html`（中科海讯）
+- `https://gu.qq.com/sz000858/gp`（五粮液）
+- `https://gu.qq.com/sz300810/gp`（中科海讯）
+
+> 人决 D8（2026-09-09）：东财对本机 IP 持续下发滑块验证，默认目标切腾讯 gu.qq.com（用户实测暂无反爬）；东财旧链仍可手动输入但不保证成功率（遗留痕见架构 §5 D4/D7 与下方已知事项 2）。
 
 ### 已知事项（真机 E2E 实测踩坑 · 2026-09-09）
 
@@ -72,6 +74,23 @@ curl -i http://127.0.0.1:5000/             # → 200 首屏 HTML
    ```
 2. 东财**标准**个股页价格为 JS 异步渲染且可能触发「拖动下方滑块完成拼图」滑块验证（软反爬）。默认目标已切 concept 极速版链接（干扰少）；fetch 节点已加渲染完成确认（networkidle 优先 / domcontentloaded 兜底 + 非占位文本等待，`FETCH_RENDER_TIMEOUT_MS` 可调），检出滑块覆盖层即 ANTI_BOT 终态不解析半成品；仍渲染不出有效内容时结论如实输出 `insufficient_info=true`（铁律一：不降级多模态硬猜）。
 3. live 冒烟默认关：置 `ACQ_LIVE_SMOKE=1` / `RAG_LIVE_SMOKE=1` 才会真实调用外网/SiliconFlow（会烧 Key 额度）。
+
+## 语料更新（人决 D6 / D6-修订 · cninfo 定期报告抓取）
+
+内部语料目录 `company/` 按**上市编号裸 6 位**命名（`company/000858/`、`company/300810/`），对内子图（Internal RAG · pypdf + FAISS）直接消费。更新语料照抄执行：
+
+```bash
+# 抓取两家公司的最新 2 份定期报告（年报/半年报）PDF
+.venv/bin/python -m scripts.fetch_cninfo 000858 300810
+
+# 前缀写法自动归一为裸 6 位；每公司份数可调（env CNINFO_LIMIT 亦可）
+.venv/bin/python -m scripts.fetch_cninfo sz000858 sh600519 --limit 3
+```
+
+- 数据源：巨潮资讯公告查询 API（`hisAnnouncement/query`），纯 httpx 直连（不读代理环境变量），无浏览器开销。
+- 礼貌抓取：默认请求间隔 1s（`CNINFO_INTERVAL` 可调）+ 浏览器 UA；单文件失败重试 ≤2 次后跳过、不中断整批，末尾汇总失败清单。
+- 坏文件（pypdf 打不开）自动删除并计入失败清单；编号不存在则提示「未找到」且不建目录。
+- 落盘即覆盖同名文件（V1 无增量去重）；抓取后对内子图运行时自动重建索引，无需额外操作。
 
 ## 工程结构（task_project_scaffold 底座）
 

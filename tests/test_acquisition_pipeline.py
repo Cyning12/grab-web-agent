@@ -105,13 +105,13 @@ class TestContractPipeline:
         events = []
         register_status_hook(events.append)
         graph = build_acquisition_graph(fetcher=fetcher, embedder=embedder)
-        result = graph.invoke({"url": "https://quote.eastmoney.com/sz000858.html"})
+        result = graph.invoke({"url": "https://gu.qq.com/sz000858/gp"})
 
         assert "error" not in result
         payload = result["payload"]
         # ① §1.5 契约逐字段校验（url/screenshot_path/extracted_meta/pre_chunks 齐全）
         assert validate_payload(payload) == []
-        assert payload["url"] == "https://quote.eastmoney.com/sz000858.html"
+        assert payload["url"] == "https://gu.qq.com/sz000858/gp"
         assert payload["extracted_meta"]["http_status"] == 200
         assert payload["extracted_meta"]["price"] == "¥128.50"
         # ② 切分断言：块长 ∈ [512, 1024] 且 section_path/xpath 非空
@@ -142,7 +142,7 @@ class TestContractPipeline:
             graph = build_acquisition_graph(
                 fetcher=FakeFetcher(tmp_path), embedder=FakeEmbedder()
             )
-            graph.invoke({"url": "https://quote.eastmoney.com/sz000858.html"})
+            graph.invoke({"url": "https://gu.qq.com/sz000858/gp"})
         banned = ("multimodal", "vision", "多模态", "视觉")
         for record in caplog.records:
             message = record.getMessage().lower()
@@ -204,15 +204,15 @@ class TestFailureInjection:
     reason="live 冒烟默认关闭（真实浏览器 + 真实 SiliconFlow Embedding + 外网）",
 )
 class TestLiveSmoke:
-    """可选 live 冒烟：ACQ_LIVE_SMOKE=1 时跑真实东财页（concept 极速版 · task_fetch_render_wait_lite）。"""
+    """可选 live 冒烟：ACQ_LIVE_SMOKE=1 时跑真实腾讯页（gu.qq.com · 人决 D8 · task_switch_target_gu_qq）。"""
 
-    def test_live_eastmoney(self, tmp_path):
+    def test_live_gu_qq(self, tmp_path):
         from app.services.acquisition import ChunkEmbedder, PlaywrightFetcher
 
         graph = build_acquisition_graph(
             fetcher=PlaywrightFetcher(static_dir=tmp_path), embedder=ChunkEmbedder()
         )
-        result = graph.invoke({"url": "https://quote.eastmoney.com/concept/sz000858.html"})
+        result = graph.invoke({"url": "https://gu.qq.com/sz000858/gp"})
         if "error" in result:  # 反爬/超时属已定义失败路径，live 环境不保证成功率
             assert result["error"]["code"] in {
                 "FETCH_TIMEOUT",

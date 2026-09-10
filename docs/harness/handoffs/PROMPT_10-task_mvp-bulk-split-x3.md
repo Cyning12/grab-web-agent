@@ -11,7 +11,7 @@
 
 ## 输入（必读）
 
-1. `docs/spec/SPEC-web-research-agent_v1.md` —— 已回填的 SPEC draft
+1. `docs/spec/web-research-agent/SPEC-web-research-agent_v1.md` —— 已回填的 SPEC draft
 2. `docs/spec/_source/PRD_web_research_agent_v2.md` —— PRD 原文（双轨策略 §2.2 / MVP 范围 §8）
 3. `docs/harness/templates/TASK_TEMPLATE.md` —— task 文件结构真值（逐节遵循）
 

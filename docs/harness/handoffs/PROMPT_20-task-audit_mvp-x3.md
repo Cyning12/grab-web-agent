@@ -12,7 +12,7 @@
 ## 输入（必读）
 
 1. 被审 task：`docs/tasks/active/{TASK_FILE}`（你被派的那一个）
-2. 对照真值：`docs/spec/SPEC-web-research-agent_v1.md`（signed）+ `docs/spec/_source/PRD_web_research_agent_v2.md`
+2. 对照真值：`docs/spec/web-research-agent/SPEC-web-research-agent_v1.md`（signed）+ `docs/spec/_source/PRD_web_research_agent_v2.md`
 3. 结构真值：`docs/harness/templates/TASK_TEMPLATE.md`
 
 ## 审查要点

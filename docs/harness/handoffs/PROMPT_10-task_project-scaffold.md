@@ -9,7 +9,7 @@
 ## 输入（必读）
 
 1. `docs/spec/architecture/frontend_backend_breakdown_v1.md`（架构真值 · 含 §5 决策记录 D1–D6）
-2. `docs/spec/SPEC-web-research-agent_v1.md`（signed）
+2. `docs/spec/web-research-agent/SPEC-web-research-agent_v1.md`（signed）
 3. `docs/harness/templates/TASK_TEMPLATE.md`（结构真值）
 4. `docs/tasks/active/` 现有三 task（本 task 是它们的**前置公共底座**，依赖节须被三 task 反向引用——你只写本 task 文件，不改那三个文件，但在回报中提醒 00 需要补反向依赖）
 

@@ -2,7 +2,7 @@
 
 > **审查帽**：20-task-audit（task 书面审查 · 不实现代码 · 不改 task 实质内容）
 > **被审 task**：`docs/tasks/active/task_web_console_mvp.md`（task_slug：`web_console_mvp`）
-> **对照真值**：`docs/spec/SPEC-web-research-agent_v1.md`（signed · HG-SPEC-SIGNOFF=approved）+ `docs/spec/_source/PRD_web_research_agent_v2.md`
+> **对照真值**：`docs/spec/web-research-agent/SPEC-web-research-agent_v1.md`（signed · HG-SPEC-SIGNOFF=approved）+ `docs/spec/_source/PRD_web_research_agent_v2.md`
 > **结构真值**：`docs/harness/templates/TASK_TEMPLATE.md`
 > **审查日期**：2026-09-09 · 轮次：R1
 
@@ -61,7 +61,7 @@
 
 ### 6. 依赖与双轨 Mock 解耦 ✅
 
-- 跨 task 依赖为相对路径且实测存在：`./task_web_acquisition_subgraph.md`、`./task_internal_rag_subgraph.md`、`docs/spec/SPEC-web-research-agent_v1.md`、`docs/harness/reviews/spec_web-research-agent_audit_R1_20260909.md` 全部真实落盘。
+- 跨 task 依赖为相对路径且实测存在：`./task_web_acquisition_subgraph.md`、`./task_internal_rag_subgraph.md`、`docs/spec/web-research-agent/SPEC-web-research-agent_v1.md`、`docs/harness/reviews/spec_web-research-agent_audit_R1_20260909.md` 全部真实落盘。
 - Mock 解耦声明与 PRD §6.2 契约一致：Mock Payload 字段（`screenshot_path`/`extracted_meta`/`pre_chunks[]`）与 PRD §6.2 JSON 逐字段吻合；`section_path`/`xpath` 溯源字段回溯 PRD §4.3；Mock 结论三字段（竞品价格/风险等级/建议动作）与 PRD §3.2 Step 3 / §5.2 一致。acquisition 与 internal 可并行声明符合 PRD §2.2 双轨策略。
 - 必读列表中 `AGENTS.md`/`docs/meta/`/`docs/standards/` 已注明「若存在」「当前缺失时按仓通用约定执行」（实测确缺失），无悬空硬依赖。
 

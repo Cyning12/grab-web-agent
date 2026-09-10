@@ -82,7 +82,7 @@
 1. **依赖对外子图**：PRD §6.2 标准 Payload 契约（`screenshot_path`/`extracted_meta`/`pre_chunks[]`），见 `./task_web_acquisition_subgraph.md`。**可并行**：开发期以 Mock Payload 驱动三块回填区。
 2. **依赖对内子图**：结论 JSON Schema（竞品价格/风险等级/建议动作）与回填回调（成功/失败/工单号），见 `./task_internal_rag_subgraph.md`。**可并行**：开发期以 Mock 结论 + Mock 工单号驱动 Step 3 与闭环提示。
 3. **Supervisor 编排**：状态机迁移事件的产生依赖 LangGraph 主控图接线（由 00 决定归属：可在本 task 内交付 Supervisor 薄壳，或单独拆 task；本 task 默认承担 FastAPI 侧的 Supervisor 触发接线）。
-4. SPEC：`docs/spec/SPEC-web-research-agent_v1.md`（A1/A2/A3/A4/A5/A8/A9 的页面侧判据）。
+4. SPEC：`docs/spec/web-research-agent/SPEC-web-research-agent_v1.md`（A1/A2/A3/A4/A5/A8/A9 的页面侧判据）。
 
 ---
 
@@ -118,7 +118,7 @@
 ## 给执行帽的必读列表
 
 1. `AGENTS.md` · `docs/meta/PROJECT_CONFIG_*.md`（若存在）
-2. 关联 SPEC：`docs/spec/SPEC-web-research-agent_v1.md`（已签收 · 范围第 3/4/5 条 / A1–A5/A8/A9 / R2 分叉一）
+2. 关联 SPEC：`docs/spec/web-research-agent/SPEC-web-research-agent_v1.md`（已签收 · 范围第 3/4/5 条 / A1–A5/A8/A9 / R2 分叉一）
 3. PRD 真值：`docs/spec/_source/PRD_web_research_agent_v2.md` §3、§6.1、§6.3、§8.2/8.3
 4. 审计观察项：`docs/harness/reviews/spec_web-research-agent_audit_R1_20260909.md` 观察项 2（进程拓扑，已钉死为「Flask 仅渲染、API/SSE 全走 FastAPI」）
 5. 并行轨 task：`./task_web_acquisition_subgraph.md`（Payload 契约）、`./task_internal_rag_subgraph.md`（结论 Schema 与工单号回调）

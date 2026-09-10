@@ -7,7 +7,7 @@
 | **审查轮次** | R1 |
 | **审查日期** | 2026-09-09 |
 | **审查帽** | 20-task-audit（skill 已加载并遵守「只做/禁止」） |
-| **对照真值** | `docs/spec/SPEC-web-research-agent_v1.md`（signed）+ `docs/spec/_source/PRD_web_research_agent_v2.md` + `docs/spec/architecture/frontend_backend_breakdown_v1.md`（§5 决策 D1–D6） |
+| **对照真值** | `docs/spec/web-research-agent/SPEC-web-research-agent_v1.md`（signed）+ `docs/spec/_source/PRD_web_research_agent_v2.md` + `docs/spec/architecture/frontend_backend_breakdown_v1.md`（§5 决策 D1–D6） |
 | **结构真值** | `docs/harness/templates/TASK_TEMPLATE.md` |
 | **前置闸** | HG-TASK-DRAFT = approved（人签 2026-09-09 会话）✅ |
 

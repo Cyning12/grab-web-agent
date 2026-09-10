@@ -11,7 +11,7 @@
 
 ## 输入（必读）
 
-1. `docs/spec/SPEC-web-research-agent_v1.md` —— 被审对象（draft · R0–R5 已回填）
+1. `docs/spec/web-research-agent/SPEC-web-research-agent_v1.md` —— 被审对象（draft · R0–R5 已回填）
 2. `docs/spec/_source/PRD_web_research_agent_v2.md` —— 对照真值（审查 SPEC 是否忠实于 PRD）
 
 ## 审查要点

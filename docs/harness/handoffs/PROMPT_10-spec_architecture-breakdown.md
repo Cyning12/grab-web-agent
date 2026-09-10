@@ -10,7 +10,7 @@
 
 ## 输入（必读，按序）
 
-1. `docs/spec/SPEC-web-research-agent_v1.md`（signed · 铁律边界/A1–A9/R2 选型结论）
+1. `docs/spec/web-research-agent/SPEC-web-research-agent_v1.md`（signed · 铁律边界/A1–A9/R2 选型结论）
 2. `docs/spec/_source/PRD_web_research_agent_v2.md`（§2 编排 / §3 前端 / §4 对外 / §5 对内 / §6 契约与状态机 / §7 技术栈）
 3. `docs/tasks/active/` 三个 task（吸收已钉死项：A7=2C/4G+RSS≤3072MB · Flask 仅渲染/API+SSE 走 FastAPI · 双轨 Mock 解耦）
 4. `docs/spec/architecture/frontend_backend_breakdown_v1.md`（你回填的壳）

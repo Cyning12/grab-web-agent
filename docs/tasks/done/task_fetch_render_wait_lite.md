@@ -99,7 +99,7 @@
 
 ## 给执行帽的必读列表
 
-1. `docs/spec/SPEC-web-research-agent_v1.md`（铁律一 / failure_paths FP-1/FP-2）
+1. `docs/spec/web-research-agent/SPEC-web-research-agent_v1.md`（铁律一 / failure_paths FP-1/FP-2）
 2. `docs/spec/architecture/frontend_backend_breakdown_v1.md` §1.3（fetch_page 三行式）与 §5 决策 D4
 3. `docs/tasks/done/task_web_acquisition_subgraph.md`（对外子图既有实现与验收）
 4. `docs/harness/reviews/task_web_acquisition_subgraph_audit_R1_20260909.md`
