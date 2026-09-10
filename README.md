@@ -59,10 +59,12 @@ curl -i http://127.0.0.1:5000/             # → 200 首屏 HTML
 
 打开 `http://127.0.0.1:5000/`（管理员视角 `?role=admin`），输入目标 URL 点「开始调研」即可看到三区块渐进回填与底部工单回执。
 
-演示目标 URL（东财概念极速版 · 人决 D4 修订 · 默认 `TASK_TARGET_URLS` 同款）：
+演示目标 URL（腾讯自选股 · 人决 D8 · 默认 `TASK_TARGET_URLS` 同款）：
 
-- `https://quote.eastmoney.com/concept/sz000858.html`（五粮液）
-- `https://quote.eastmoney.com/concept/sz300810.html`（中科海讯）
+- `https://gu.qq.com/sz000858/gp`（五粮液）
+- `https://gu.qq.com/sz300810/gp`（中科海讯）
+
+> 人决 D8（2026-09-09）：东财对本机 IP 持续下发滑块验证，默认目标切腾讯 gu.qq.com（用户实测暂无反爬）；东财旧链仍可手动输入但不保证成功率（遗留痕见架构 §5 D4/D7 与下方已知事项 2）。
 
 ### 已知事项（真机 E2E 实测踩坑 · 2026-09-09）
 

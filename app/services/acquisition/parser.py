@@ -63,15 +63,25 @@ def _is_leaf_text_div(el: Any) -> bool:
     return len(_block_text(el)) >= _LEAF_DIV_MIN_CHARS
 
 
-def _extract_price(soup: BeautifulSoup) -> str:
-    """CSS 语义推断价格：class/id 含 price 优先，其次 ¥ 金额正则，最后小数点两位数字。"""
+def _extract_price(soup: BeautifulSoup, title: str = "") -> str:
+    """CSS 语义推断价格：class/id 含 price 且文本含数字者优先，其次标题正则，最后正文正则。
+
+    - 选择器命中但文本纯标签（腾讯 gu.qq.com 的 span#price 文本为「分价」标签而非数值）时
+      跳过继续找，避免误提取（task_switch_target_gu_qq 最小适配点）；
+    - 标题兜底：腾讯页标题带实时价（「五 粮 液 71.16 -0.49(-0.68%)_财经频道_腾讯网」），
+      先于正文正则（正文首个两位小数可能是大盘指数而非个股价）。
+    """
     for el in soup.select(_PRICE_SELECTOR):
         text = _block_text(el)
-        if text:
+        if text and any(ch.isdigit() for ch in text):
             return text[:50]
-    body_text = soup.get_text(" ", strip=True)
-    match = _PRICE_PATTERN.search(body_text) or _PRICE_FALLBACK_PATTERN.search(body_text)
-    return match.group(0) if match else ""
+    for source in (title, soup.get_text(" ", strip=True)):
+        if not source:
+            continue
+        match = _PRICE_PATTERN.search(source) or _PRICE_FALLBACK_PATTERN.search(source)
+        if match:
+            return match.group(0)
+    return ""
 
 
 def _extract_meta(soup: BeautifulSoup) -> dict[str, str]:
@@ -105,7 +115,7 @@ def parse_page(
     extracted_meta = {
         "title": title,
         "meta": _extract_meta(soup),
-        "price": _extract_price(soup),
+        "price": _extract_price(soup, title),
         "http_status": http_status,
     }
 

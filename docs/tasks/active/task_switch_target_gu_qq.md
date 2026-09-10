@@ -101,9 +101,10 @@
 
 | 项 | 状态 | 备注 |
 |----|------|------|
-| 腾讯页解析适配点 | ⏳ | |
-| sz000858 真机结果 | ⏳ | |
-| sz300810 真机结果 | ⏳ | |
+| 腾讯页解析适配点 | ✅ 最小适配（限 parser.py） | 真机首跑探测（2026-09-09）：http 200 · anti_bot=False · 283 blocks / 5855 tokens / 6 切片 token_count ∈ [869,1018] ⊂ [512,1024]——**提取非空、切分合法，chunker 零改动**（审查建议②「切分明显不合法」判定实例：不适用，chunker 未动，留痕于此）。唯一缺陷：`_extract_price` 首个选择器命中 `span#price` 文本为「分价」标签（非数值）误提取；真价 71.16 在 `<title>`「五 粮 液 71.16 -0.49(-0.68%)_…」。适配（parser.py 选择器/语义规则增补 ×2）：① 选择器命中文本**无数字即跳过**（纯标签不取）；② **标题正则兜底**（¥ 金额 → 两位小数）置于正文正则之前（正文首个两位小数是大盘指数 3951.51 而非个股价）。东财夹具用例（¥128.50 选择器命中含数字 / 无标题正文兜底）全部保持绿 |
+| 旧测影响面处置（开工首命令 grep 实测 9 文件 26 处） | ✅ 改 8 / 保留 18 | 实测 `grep -rn "eastmoney" tests/` = **9 文件 26 处**（quote.eastmoney.com 字面量 20 处），与 R1 审查实测完全吻合。**改腾讯（默认目标语义 8 处）**：test_web_console_sse.py:26 TARGET_URL（+注释行）· test_web_console_api.py:69/86 API 入参 ×2 · test_acquisition_pipeline.py:108/114（契约 happy path）+ 145（铁律一审计）+ 209/215（live 冒烟改名 test_live_gu_qq + URL → gu.qq.com，维持默认 skipped 钉死 collected 口径）。**保留东财（反爬/失败注入/SSRF/对内透传语义 18 处）**：test_acquisition_browser.py ×8（滑块 iframe websitecaptcha/slidervalid、广告 iframe same.eastmoney、FakePage 占位 URL——反爬检出 fixture 语义）· test_acquisition_pipeline.py:159/170/185/196（超时/ANTI_BOT/空解析/EMBED 失败注入桩，URL 仅参数）· test_acquisition_url.py ×2（SSRF 白名单公网接受用例，东财仍合法公网 URL）· internal_rag_fakes.py / test_internal_rag_contract / test_internal_rag_graph / test_internal_rag_live ×4（对内 fixture/契约，URL 仅透传，本 task 不碰对内链路）。处置后复跑实测剩余 **18 处**，与标注逐条一致 |
+| sz000858 真机结果 | ✅ Done（2026-09-09 23:11 本机） | NO_PROXY/no_proxy 大小写双写净化 + uvicorn:8011 全管道：Pending→Fetching(10%)→Parsing(50%)→**6 切片**（真实行情文本：昨收 71.65/今开 71.64/总市值 2762亿/股吧与个股新闻即渲染当时内容）→RAGing→progress 100→**Done**；extracted_meta：title=「五 粮 液 71.16 -0.49(-0.68%)_财经频道_腾讯网」· **price=71.16**（标题兜底实证适配生效）· http 200；结论 JSON 非空：competitor_price=「未知」· **insufficient_info=true**（价格数值已提取但对内 LLM 未硬猜，如实标注，铁律一）· sources 含半年报；**工单号 MOCK-19A83A73**；截图 `app/static/shot_5a29bdfd20_1788966704678.png`（30 亲看图：**无蒙层**、行情页完整真实，待 00 人工看图复核）；事件流 /tmp/gu_run_sz000858_events.json · 快照 /tmp/gu_run_sz000858_snapshot.json |
+| sz300810 真机结果 | ✅ Done（2026-09-10 08:49 本机） | 同口径 uvicorn:8011 全管道：Pending→…→**4 切片**（中科海讯 27.73 +11.59%、流通股东、机构预测等真实文本）→RAGing→**Done**；extracted_meta：title=「中科海讯 27.73 2.88(+11.59%)_财经频道_腾讯网」· **price=27.73** · http 200；结论 JSON 非空 · insufficient_info=true（如实）· sources 含半年报；**工单号 MOCK-CE85445C**；截图 `app/static/shot_6027093525_1789001383890.png`（30 亲看图：**无蒙层**、内容真实，待 00 人工看图复核）；事件流 /tmp/gu_run_sz300810_events.json · 快照 /tmp/gu_run_sz300810_snapshot.json |
 
 ---
 
@@ -115,7 +116,25 @@
 
 ### 自检结论（执行者）
 
-（30/40 回填）
+30/40 同上下文闭环（2026-09-09/10 · worktree `.worktrees/gu` · 分支 `task/switch_target_gu_qq`）：
+
+| 验收项 | 结论 | 证据 |
+|--------|------|------|
+| 全量测试通过（基线 129=127+2 不回退） | ✅ pass | `.venv/bin/python -m pytest tests -q` exit 0：**131 passed, 2 skipped**；`--collect-only` = **133 collected**（基线 129 + 腾讯 fixture/价格适配新用例 4，零回退、skipped 无新增失败） |
+| lint-wiki-delta | ✅ pass | `npx --yes dsh-coding-kit@1.11.0 task lint-wiki-delta --target .` exit 0（LINT-WIKI-DELTA: PASS · scanned 8 · issues 0） |
+| fixture 解析断言 | ✅ pass | `tests/fixtures/gu_qq_sz000858.html`（真机快照 226KB · http 200 · anti_bot=False）→ `tests/test_acquisition_parser_gu_qq.py` ×4：切片 6 ≥1 且 token_count ∈ [869,1018]、section_path/xpath 全非空、正文非全占位（存在 ≥30 字符真实正文块）、price=71.16（非「分价」标签） |
+| 旧测影响面处置完毕 | ✅ pass | grep 实测 9 文件 26 处逐条处置：改 8（默认目标语义 → 腾讯）/ 保留 18（反爬/失败注入/SSRF/对内透传）；处置后复跑 grep 余 18 处与标注一致（详见实现备忘行） |
+| 双股票真机闭环（一票否决级） | ✅ pass（待 00 人工看图终签） | sz000858：Pending→…→Done · 6 切片 · price=71.16 · 工单 **MOCK-19A83A73** · 截图 `app/static/shot_5a29bdfd20_1788966704678.png`；sz300810：Pending→…→Done · 4 切片 · price=27.73 · 工单 **MOCK-CE85445C** · 截图 `app/static/shot_6027093525_1789001383890.png`；30 已亲看两图：无蒙层、行情内容真实 |
+| 默认 URL 断言 | ✅ pass | `.env.example` L8 TASK_TARGET_URLS 与 README 演示节均为 `https://gu.qq.com/sz000858/gp` + `https://gu.qq.com/sz300810/gp`（grep 实证）；架构 §5 增 D8 决策行 + 修订记录一行 |
+
+命令块（workdir=.worktrees/gu）：
+- `npm_config_cache=/tmp/npm-cache-dsh npx --yes dsh-coding-kit@1.11.0 verify --task docs/tasks/active/task_switch_target_gu_qq.md` → exit 0 **VERIFY: PASS**（开工首跑 · 首输出 GATE_VERIFY 闸扫描双闸 approved）
+- `grep -rn "eastmoney" tests/` → 26 处（开工第一条命令，审查建议①落实）；处置后 → 18 处
+- `.venv/bin/python -m pytest tests -q` → exit 0（131 passed, 2 skipped）；`--collect-only -q` → 133 collected
+- `npm_config_cache=/tmp/npm-cache-dsh npx --yes dsh-coding-kit@1.11.0 task lint-wiki-delta --target .` → exit 0
+- 真机：`env NO_PROXY=localhost,127.0.0.1,::1 no_proxy=localhost,127.0.0.1,::1 .venv/bin/python -m uvicorn app.api.main:app --port 8011` + POST /api/task + SSE 全事件收集（5 分钟硬超时兜底）×2 URL → 双 Done（事件流/快照 /tmp/gu_run_* 留档，截图 app/static/）
+
+已知未测项：① 截图 00 人工看图终签待做（30 已亲看两图无蒙层）；② live 冒烟（ACQ_LIVE_SMOKE=1）维持默认 skipped 未真跑（真机双 URL 闭环已覆盖同路径）；③ 腾讯页「分价表/大单数据」等二级页未抓取（非本 task 范围）。
 
 ---
 
