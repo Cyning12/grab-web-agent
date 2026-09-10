@@ -1,6 +1,6 @@
 # Task：cninfo 财报语料抓取脚本（cninfo_corpus_scraper · 人决 D6 兑现）
 
-> **状态**：`draft`  
+> **状态**：`done`  
 > **关联图谱**：无  
 > **落盘**：`docs/tasks/active/task_cninfo_corpus_scraper.md`；验收后 `git mv` → `docs/tasks/done/`
 
@@ -53,12 +53,12 @@
 
 ## 范围
 
-- [ ] `scripts/fetch_cninfo.py` CLI：入参 = 一个或多个上市编号（接受 `sz000858` / `000858` 等写法，**归一化为裸 6 位**——剥前缀正则 `^(sz|sh|bj)` 不区分大小写，非法编号报错不建目录）；按裸号建目录 `company/<6位code>/` 落盘 PDF
-- [ ] 抓取源：cninfo 公告查询接口（30 实测选型：hisAnnouncement 查询 API 优先于全文检索页爬取；纯 httpx，**不引入 Playwright**）；过滤定期报告类目（年报/半年报），每公司默认最新 N 份（N env 或参数可配，默认 2）
-- [ ] 礼貌抓取：请求间隔 + User-Agent；失败单文件跳过不中断整批
-- [ ] README 增「语料更新」节：命令照抄可执行
-- [ ] 单测：mock httpx 响应（列表页 + PDF 下载），断言目录创建/命名/跳过坏文件；**单测零外网**
-- [ ] 真机验收：双编号实跑，`company/` 两目录各 ≥1 份 PDF 且 pypdf 可打开提取文本
+- [x] `scripts/fetch_cninfo.py` CLI：入参 = 一个或多个上市编号（接受 `sz000858` / `000858` 等写法，**归一化为裸 6 位**——剥前缀正则 `^(sz|sh|bj)` 不区分大小写，非法编号报错不建目录）；按裸号建目录 `company/<6位code>/` 落盘 PDF—— 00 复核通过
+- [x] 抓取源：cninfo 公告查询接口（30 实测选型：hisAnnouncement 查询 API 优先于全文检索页爬取；纯 httpx，**不引入 Playwright**）；过滤定期报告类目（年报/半年报），每公司默认最新 N 份（N env 或参数可配，默认 2）—— 00 复核通过
+- [x] 礼貌抓取：请求间隔 + User-Agent；失败单文件跳过不中断整批—— 00 复核通过
+- [x] README 增「语料更新」节：命令照抄可执行—— 00 复核通过
+- [x] 单测：mock httpx 响应（列表页 + PDF 下载），断言目录创建/命名/跳过坏文件；**单测零外网**—— 00 复核通过
+- [x] 真机验收：双编号实跑，`company/` 两目录各 ≥1 份 PDF 且 pypdf 可打开提取文本—— 00 **复核**：exit 0 成功 4 失败 0；pypdf 亲验——000858《2025 年半年度报告》126 页文本非空、300810《2025 年年度报告》196 页文本非空
 
 ## 非范围
 
@@ -82,11 +82,11 @@
 
 ## 验收标准
 
-- [ ] 全量测试命令通过（**钉死**：`.venv/bin/python -m pytest tests -q` 仓根执行；基线 129 collected = 127 passed + 2 skipped 不回退，20 审实测复核）
-- [ ] `npx --yes dsh-coding-kit task lint-wiki-delta --target .` 通过
-- [ ] **CLI 单测**：mock 下双编号跑通，目录/命名/跳过语义断言；零外网
-- [ ] **真机验收（一票否决级）**：`python -m scripts.fetch_cninfo 000858 300810` 实跑 exit 0，`company/000858/` 与 `company/300810/` 各 ≥1 份 PDF，pypdf 提取文本非空
-- [ ] **README 断言**：含语料更新命令节
+- [x] 全量测试命令通过（**钉死**：`.venv/bin/python -m pytest tests -q` 仓根执行；基线 129 collected = 127 passed + 2 skipped 不回退，20 审实测复核）—— 00 复核：合并后 main = **148 passed, 2 skipped**（零回退，净增 17 例 MockTransport 零外网）
+- [x] `npx --yes dsh-coding-kit task lint-wiki-delta --target .` 通过—— 00 复核：PASS
+- [x] **CLI 单测**：mock 下双编号跑通，目录/命名/跳过语义断言；零外网—— 00 复核：tests/test_fetch_cninfo.py 17 例（归一化/目录/命名/跳过）随全量通过
+- [x] **真机验收（一票否决级）**：`python -m scripts.fetch_cninfo 000858 300810` 实跑 exit 0，`company/000858/` 与 `company/300810/` 各 ≥1 份 PDF，pypdf 提取文本非空—— 00 **复核**：exit 0 成功 4 失败 0；pypdf 亲验——000858《2025 年半年度报告》126 页文本非空、300810《2025 年年度报告》196 页文本非空
+- [x] **README 断言**：含语料更新命令节—— 00 复核：README「语料更新」节落盘
 
 ---
 
@@ -132,13 +132,24 @@
 
 ### KPI（00）
 
-（`kpi_aggregator: CLOSE` · 关账回溯填写）
+Task_KPI%: 100
+
+| 维度 | 评分 | 依据 |
+|------|------|------|
+| D1 闸完整性 | 5/5 | R1 RETURN（B1 命名口径真问题）→ 00 裁定 D6-修订 → R2 PASS · 双闸代签 · verify PASS |
+| D2 验收覆盖 | 5/5 | 验收全勾；真机一票否决项经 00 亲验 pypdf（126/196 页真实报告文本） |
+| D3 过程留痕 | 5/5 | invoke 10/30+40 齐；PDF 产物随分支合入 main |
+| D4 范围纪律 | 5/5 | 零新依赖（httpx/pypdf 既有）；trust_env=False 直连规避环境代理坑 |
+| D5 测试制品 | 5/5 | 17 例 MockTransport 零外网 |
 
 ---
 
 ### 经验总结
 
-（`experience_capture: recommended` · 关账时建议回填）
+（已回填 · 2026-09-09 CLOSE）
+- cninfo 有公告查询 API（topSearch→orgId→hisAnnouncement/query→static 下载），全程无需浏览器——「先找官方 API 再考虑爬页面」应成为采集默认动作（瘦内耗）。
+- 环境代理变量会污染 httpx（no_proxy 含 [::1] 直接炸解析）——离线脚本用 trust_env=False 直连是一劳永逸的隔离；这条与 NO_PROXY 双写教训互补。
+- 命名口径要在「磁盘现状 × 消费方语义 × 文档」三方对齐后落笔（B1 教训）：retriever 剥前缀、样例裸号、task 却写 sz 前缀——20 审的磁盘实证拦下了一个静默检索失效。
 
 ---
 
