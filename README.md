@@ -75,6 +75,23 @@ curl -i http://127.0.0.1:5000/             # → 200 首屏 HTML
 2. 东财**标准**个股页价格为 JS 异步渲染且可能触发「拖动下方滑块完成拼图」滑块验证（软反爬）。默认目标已切 concept 极速版链接（干扰少）；fetch 节点已加渲染完成确认（networkidle 优先 / domcontentloaded 兜底 + 非占位文本等待，`FETCH_RENDER_TIMEOUT_MS` 可调），检出滑块覆盖层即 ANTI_BOT 终态不解析半成品；仍渲染不出有效内容时结论如实输出 `insufficient_info=true`（铁律一：不降级多模态硬猜）。
 3. live 冒烟默认关：置 `ACQ_LIVE_SMOKE=1` / `RAG_LIVE_SMOKE=1` 才会真实调用外网/SiliconFlow（会烧 Key 额度）。
 
+## 语料更新（人决 D6 / D6-修订 · cninfo 定期报告抓取）
+
+内部语料目录 `company/` 按**上市编号裸 6 位**命名（`company/000858/`、`company/300810/`），对内子图（Internal RAG · pypdf + FAISS）直接消费。更新语料照抄执行：
+
+```bash
+# 抓取两家公司的最新 2 份定期报告（年报/半年报）PDF
+.venv/bin/python -m scripts.fetch_cninfo 000858 300810
+
+# 前缀写法自动归一为裸 6 位；每公司份数可调（env CNINFO_LIMIT 亦可）
+.venv/bin/python -m scripts.fetch_cninfo sz000858 sh600519 --limit 3
+```
+
+- 数据源：巨潮资讯公告查询 API（`hisAnnouncement/query`），纯 httpx 直连（不读代理环境变量），无浏览器开销。
+- 礼貌抓取：默认请求间隔 1s（`CNINFO_INTERVAL` 可调）+ 浏览器 UA；单文件失败重试 ≤2 次后跳过、不中断整批，末尾汇总失败清单。
+- 坏文件（pypdf 打不开）自动删除并计入失败清单；编号不存在则提示「未找到」且不建目录。
+- 落盘即覆盖同名文件（V1 无增量去重）；抓取后对内子图运行时自动重建索引，无需额外操作。
+
 ## 工程结构（task_project_scaffold 底座）
 
 | 路径 | 内容 |
