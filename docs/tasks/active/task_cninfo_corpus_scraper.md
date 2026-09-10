@@ -103,8 +103,8 @@
 
 | 项 | 状态 | 备注 |
 |----|------|------|
-| cninfo API 选型实测 | ⏳ | |
-| 双编号真机结果 | ⏳ | |
+| cninfo API 选型实测 | ✅ | 公告查询 API 可用（纯 httpx，未引 Playwright）：① `POST /new/information/topSearch/query` 拿 orgId（GET 返 500，须 POST 表单）；② `POST /new/hisAnnouncement/query`（stock=code,orgId · category=category_ndbg_szsh;category_bndbg_szsh · pageSize=30）→ totalAnnouncement=119 命中；③ `http://static.cninfo.com.cn/<adjunctUrl>` 下载 PDF。客户端 `trust_env=False` 直连（环境代理 127.0.0.1:7890 且 no_proxy 含 [::1] 会炸 httpx URLPattern 解析）。标题剔除 摘要/英文/更新前/已取消，按报告期去重取最新 N（默认 2，--limit / CNINFO_LIMIT 可配） |
+| 双编号真机结果 | ✅ | `NO_PROXY/no_proxy=localhost,127.0.0.1,::1`（大小写双写）实跑 `python -m scripts.fetch_cninfo 000858 300810` → exit 0、成功 4 份失败 0。落盘：company/000858/ += 2026年半年度报告.pdf、2025年半年度报告（更新后）.pdf；company/300810/ += 2026年半年度报告.pdf、2025年年度报告.pdf；pypdf 首页提取均非空（45/63/93/85 字符，公司名可辨）。注：000858 按公告时间取最新 2 份时 2025 半年报（更新后，2026-04-30 披露）排序在 2025 年报前，属「最新 N 份」语义正常 |
 
 ---
 
@@ -116,7 +116,17 @@
 
 ### 自检结论（执行者）
 
-（30/40 回填）
+30/40 同上下文闭环（2026-09-09 · task/cninfo_corpus_scraper）：
+
+| 验收项 | 结论 | 证据 |
+|--------|------|------|
+| 全量测试 `.venv/bin/python -m pytest tests -q` | ✅ pass | 144 passed + 2 skipped（基线 127+2 + 新增 17，不回退），exit 0 |
+| lint-wiki-delta | ✅ pass | `task lint-wiki-delta --target .` → LINT-WIKI-DELTA: PASS（issues: 0），exit 0 |
+| CLI 单测（mock 零外网） | ✅ pass | tests/test_fetch_cninfo.py 17 passed：归一化 12 例（含非法 6 例）+ 双编号目录/命名/剔除/去重 + 非法编号 exit 2 不建目录 + 未收录编号不建目录 + 下载 500 重试 2 次跳过 + 坏 PDF 删除计失败；httpx.MockTransport 全程零外网 |
+| 真机验收（一票否决） | ✅ pass | 实跑 exit 0；company/000858/、company/300810/ 各 ≥1 份新 PDF（各 2 份）；pypdf 提取文本非空（见实现备忘） |
+| README 断言 | ✅ pass | README.md 增「语料更新（人决 D6 / D6-修订）」节，命令照抄可执行 |
+
+命令块（仓根 .worktrees/cninfo）：verify exit 0（VERIFY: PASS）· pytest exit 0 · lint-wiki-delta exit 0 · 真机 exit 0。已知未测项：沪/京 column 段推断仅实测深市两只；增量去重 V1 同名覆盖（非范围项）。
 
 ---
 
